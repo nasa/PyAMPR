@@ -13,6 +13,8 @@ try:
 except:
     pass
 
+VERSION='1.3.2'
+
 DESCRIPTION="The Python Advanced Microwave Precipitation Radiometer Data Toolkit (PyAMPR) - a package to read, analyze, and display AMPR data"
 
 LONG_DESCRIPTION="""Download AMPR data from http://ghrc.nsstc.nasa.gov.
@@ -31,24 +33,23 @@ deconvolution is available."""
 
 setup(
     name="pyampr",
-    version="1.3.1",
+    version=VERSION,
     author="Timothy J. Lang",
     author_email="timothy.j.lang@nasa.gov",
     url="http://ghrc.nsstc.nasa.gov/",
     description=DESCRIPTION,
     long_description=LONG_DESCRIPTION,
     download_url="http://ghrc.nsstc.nasa.gov/",
-    license="NASA MSFC",
+    license="LICENSE.md",
     packages=["pyampr"],
     platforms="Python 2.7",
-    classifiers=[
-        "Development Status :: 5 - Production/Stable",
-        "License :: OSI Approved :: NASA MSFC License",
-        "Operating System :: OS Independent",
-        "Programming Language :: Python",
-        "Intended Audience :: Science/Research",
-#        "Topic :: Formats and Protocols :: Data Formats",
-#        "Topic :: Scientific/Engineering :: Earth Sciences",
-#        "Topic :: Software Development :: Libraries :: Python Modules"
-        ]
+    classifiers=["""
+        Development Status :: Beta,
+        Programming Language :: Python",
+        Topic :: Scientific/Engineering
+        Topic :: Scientific/Engineering :: Atmospheric Science
+        Operating System :: Unix
+        Operating System :: POSIX :: Linux
+        Operating System :: MacOS
+        """]
     )

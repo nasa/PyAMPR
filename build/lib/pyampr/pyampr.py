@@ -6,8 +6,7 @@ import datetime
 import calendar
 import gzip
 import codecs
-from google_earth_tools import (gearth_fig, make_kml, kml_contour, kml_begin,
-                                kml_end, line_begin, line_end, place_label)
+from google_earth_tools import gearth_fig, make_kml
 
 try:
     from udf_cmap import amprTB_cmap
@@ -15,7 +14,7 @@ try:
 except ImportError:
     CMAP_FLAG = False
 
-VERSION = '1.3.1'
+VERSION = '1.3.2'
 
 #Fixed constants used by PyAMPR set here
 DEFAULT_CLEVS = [75, 325]
@@ -66,6 +65,7 @@ If you read one project's data while mistakenly telling PyAMPR the data
 are from a different project, then errors are likely.
 
 Notable attributes in output data class
+(Note - Order in documentation does not necessarily match order in data files)
 ---------------------------------------
 nscans = Number of scans (depends on file)
 swath_size = 50 (hard coded)
@@ -95,7 +95,7 @@ Elevation - Topographic elevation (m MSL)
 
 shape = (nscans, nav_size)
 *****
-Aircraft_Nav - Pythonb dict of Aircraft navigation info: key (units)
+Aircraft_Nav - Python dict of Aircraft navigation info: key (units)
 GPS Latitude       (deg)
 GPS Longitude      (deg)
 GPS Altitude       (m MSL)
@@ -483,68 +483,6 @@ timerange = Time range to plot. Overrides scanrange if both are set.
         #Save the plot and clean up
         if save != None:
             plt.savefig(save)
-        _method_footer_printout()
-
-    #########################################
-
-    def write_ampr_kml(self, var=DEFAULT_VAR, file_path=None, file_name=None,
-                       clevs=70.0+np.arange(14)*20.0, scanrange=None,
-                       equator=False, timerange=None):
-
-        """
-Writes line contours for selected variable to kml file
-Qualitatively similar plot to plot_ampr_track() but
-for Google Earth.
-var = AMPR channel to plot (Default = DEFAULT_VAR)
-clevs = List with desired contour levels (Default = every 20 K 
-        over 70-330K range)
-scanrange = List of scan numbers (from AmprTb.Scan) to plot. 
-            Only max/min are used.
-file_path = Desired path to kml file (Default = '')
-file_name = Desired name for kml file (Default = YYYYMMDD_TB###.kml, 
-            ### = channel)
-equator = Boolean to consider 0s/-1s in Latitude/Longitude as good geolocations
-          (e.g., flight crosses Equator or Prime Meridian).
-          Default is bad geolocations.
-timerange = Time range to plot. Overrides scanrange if both are set.
-            Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
-
-        """
-        _method_header_printout()
-        print 'write_ampr_kml():'
-
-        #10 GHz (A) channel written by default
-        if not isinstance(var, str):
-            var = DEFAULT_VAR
-        
-        #Check to make sure data exist!
-        if not hasattr(self, 'TB'+var.upper()):
-            self._missing_channel_printout()
-            _method_footer_printout()
-            return
-
-        #Adjustable scan range limits
-        #Need at least 2 scans for contours to start showing up in Google Earth
-        ind1, ind2 =        self._get_scan_indices(scanrange, timerange)
-        plon, plat, zdata = self._get_data_subsection(var, ind1, ind2)
-        plon, plat, zdata = self._filter_bad_geolocations(plon, plat,
-                                                         zdata, equator)
-        enough_data =       self._check_for_enough_data_to_plot(plon, plat)
-        if not enough_data:
-            return
-        
-        #Set file info
-        if file_path == None:
-            file_path = ''
-        if file_name == None:
-            file_name = self._get_gearth_file_name(var, ind1, '.kml')
-        
-        #Call kml_contour
-        #Obtained from http://www.cameronsparr.com/pytools/kml_contour.py
-        #Made minor adjustments to provide more flexibility with file naming
-        #This is contained in the google_earth_tools package
-        kml_contour(plon, plat, zdata, file_path+file_name, levels=clevs)
-        print 'Contours hopefully written to:', file_path+file_name
         _method_footer_printout()
           
     #########################################
@@ -1405,90 +1343,6 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     ######################################
     #Add more attributes and methods here!
     ######################################
-
-    #########################################
-
-    #########################################
-
-    #########################################
-
-    #########################################
-
-    #########################################
-    #Beyond Here There Be DRAGONS!
-    #########################################
-
-    def __calc_polarization_old(self):
-
-        """
-*** NOW PRIVATE - NO LONGER USED! ***
-*** CODE IS FOR LEGACY PURPOSES ONLY ***
-
-This method calculates H & V given the mixed-pol A & B channels.
-Solves Equation 1 in Vivekanandan et al. (1993) for Tb in H and V.
-Where A or B are not good will be populated with AmprTb.bad_data.
-If successful, TB10H, TB10V, TB19H, TB19V, TB37H, TB37V, TB85H, TB85V 
-will now be attributes of the AmprTb instance. Missing channels will
-not be processed. Attempts to account for aircraft roll angle.
-
-        """
-
-        begin_time = time.time()
-        print
-        print '********************'
-        print 'calc_polarization():'
-
-        if self.Year[0] < 2011:
-            print 'Pre-2011, AMPR only had one channel per frequency.'
-            print 'Thus, PyAMPR cannot deconvolve polarization for'
-            print 'this project\'s data. Sorry!'
-            print '********************'
-            print
-            return
-
-        deg2rad = np.pi / 180.0
-        chan_list = ['10', '19', '37', '85']
-        for chan in chan_list:
-            if hasattr(self, 'TB'+chan+'A') and hasattr(self, 'TB'+chan+'B'):
-
-                print 'Calculating for',chan,'GHz channel'
-                #Use dummy variables and setattr to get the right-sized arrays
-                dummy_a = 1.0 * getattr(self, 'TB'+chan+'A')
-                dummy_b = 1.0 * getattr(self, 'TB'+chan+'B')
-                dummy_v = 0.0 * getattr(self, 'TB'+chan+'A') + self.bad_data
-                dummy_h = 0.0 * getattr(self, 'TB'+chan+'A') + self.bad_data
-
-                #Loop thru scans
-                #Solving Equation 1 in Vivekanandan et al. (1993) for
-                #Tb in H and V
-                #Currently brute force with full nested for loops
-                #as np.where() statements were giving me some problems and took longer anyway
-                #Takes about 10 seconds for a typical flight day
-                for i in xrange(self.nscans):
-                    for j in xrange(self.swath_size):
-                        x1 = (np.cos((self.swath_angle[j] - self.swath_left + \
-                              self.Aircraft_Nav['Roll'][i]) * deg2rad))**2
-                        x2 = (np.sin((self.swath_angle[j] - self.swath_left + \
-                              self.Aircraft_Nav['Roll'][i]) * deg2rad))**2
-                        if dummy_b[i][j] > 0 and dummy_a[i][j] > 0:
-                            dummy_h[i][j] = (x1 * dummy_b[i][j] - x2 * \
-                                            dummy_a[i][j]) / (x1**2 - x2**2)
-                            dummy_v[i][j] = (dummy_a[i][j] - x2 * dummy_h[i][j])\
-                                            / x1
-
-                #Finalize V & H attributes and clean up
-                setattr(self, 'TB'+chan+'V', dummy_v)
-                setattr(self, 'TB'+chan+'H', dummy_h)
-
-            else:
-                print 'TB'+chan,'does not have both A and B channels,',\
-                      'read in a file to obtain'
-                print 'Scene H & V not produced for this channel'
-            
-        print time.time() - begin_time, 'seconds to calculate H & V'
-        print 'If successful: TB10H, TB10V, TB19H, TB19V, TB37H, TB37V, TB85H, TB85V now attributes'
-        print '********************'
-        print
 
     #########################################
 
