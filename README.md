@@ -57,5 +57,5 @@ rundown on the data structure.
 
 A demonstration IPython notebook can be found in the notebooks directory.
 
-The following conference presentation describes PyAMR (among other modules):
+The following conference presentation describes PyAMPR (among other modules):
 https://ams.confex.com/ams/95Annual/webprogram/Paper262779.html
