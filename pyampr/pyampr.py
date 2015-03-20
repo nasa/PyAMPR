@@ -7,6 +7,9 @@ import calendar
 import gzip
 import codecs
 from google_earth_tools import gearth_fig, make_kml
+from netCDF4 import Dataset
+from netCDF4 import num2date, date2num
+
 
 try:
     from udf_cmap import amprTB_cmap
@@ -14,7 +17,7 @@ try:
 except ImportError:
     CMAP_FLAG = False
 
-VERSION = '1.3.2'
+VERSION = '1.4.0'
 
 #Fixed constants used by PyAMPR set here
 DEFAULT_CLEVS = [75, 325]
@@ -37,23 +40,23 @@ class AmprTb(object):
                  project=DEFAULT_PROJECT_NAME):
 
         """
-If passed a filename, call the read_ampr_tb_level1b() method, 
+If passed a filename, call the read_ampr_tb_level2b() method, 
 otherwise just instance the class with nothing
 
         """
 
         if full_path_and_filename == None:
-           print 'Class instantiated, call read_ampr_tb_level1b() to populate'
+           print 'Class instantiated, call read_ampr_tb_level2b() to populate'
         else:
-            self.read_ampr_tb_level1b(full_path_and_filename, project=project)
+            self.read_ampr_tb_level2b(full_path_and_filename, project=project)
     
     #########################################
 
-    def read_ampr_tb_level1b(self, full_path_and_filename,
+    def read_ampr_tb_level2b(self, full_path_and_filename,
                              project=DEFAULT_PROJECT_NAME):
 
         """
-Reads Level 1B AMPR data in text files provided from
+Reads Level 2B AMPR data in text files provided from
 http://ghrc.msfc.nasa.gov. Tested and working with all AMPR
 data from this site, as well as IPHEX. Depending on project,
 some variables are unused or are duplicates. Most notably,
@@ -115,88 +118,215 @@ INS Latitude       (deg)
 INS Longitude      (deg)
 INS Altitude       (m MSL) 
 
+Version 1.4.0: Added support for Level 2B netCDF files. Starting with IPHEX,
+processed AMPR instrument files will be provided in a netCDF-4 format. 
+
+
         """
 
         #Read the file contents as a string
         _method_header_printout()
-        print 'read_ampr_tb_level1b(): Reading', full_path_and_filename
+        print 'read_ampr_tb_level2b(): Reading', full_path_and_filename
         
-        #Following puts entire file contents into self.ampr_string
-        read_successfully = self._read_ampr_ascii_file(full_path_and_filename)
-        if not read_successfully:
-            return
 
-        #Assigning project name (self.Project) based on user input
-        self._assign_project_name(project)
-    
-        #Determine number of scans
-        self.nscans = np.size(self.ampr_string)
-        print 'Number of scans =', self.nscans
-    
-        #Hard-coding sizes of AMPR arrays and dictionaries
-        self._hard_code_ampr_array_sizes_and_other_metadata()
-        self._declare_ampr_variables()
+        if (full_path_and_filename[-2:] == "nc"):
+            print "netCDF file supplied, treating as such"
+            
+            #Assigning project name (self.Project) based on user input
+            self._assign_project_name(project)
+            
+            # Set bad data.            
+            self.bad_data =    DEFAULT_BAD_DATA
 
-        #Populate the variables with the file's data.
-        #Begin master loop
-        index = 0L
-        for line in self.ampr_string:
-            line_split = line.split()
-        
-            #Header info
-            if self.Project == 'IPHEX' or self.Project == 'MC3E':
-                #2011+, header info placed before TBs
-                self._fill_2011onward_header_info(line_split, index)
+
+            # Open the data       
+            inputFile = full_path_and_filename;                    
+            level2b = Dataset(inputFile , mode="r")
+    
+            # Check for navigation
+            if 'lat' in level2b.variables.keys():
+                print "Found Navigation Data!"
+                self.hasNav = True            
             else:
-                #All pre-MC3E projects, aircraft data placed with header
-                #info before TBs
-                self._fill_pre2011_header_and_aircraft_info(line_split, index)
-       
-            self.Time_String[index], self.Second_of_Day[index] =\
-                  _get_timestring_and_sod(self.Hour[index],
-                                self.Minute[index], self.Second[index])
-        
-            #Get TBs, Latitudes, Longitudes, etc.
-            for i in xrange(self.swath_size):
-                
-                if self.Project == 'IPHEX':
-                    self._fill_2011onward_ampr_variables(line_split, index, i)
-                    #Below are IPHEX-specific fixes
-                    #37 GHZ A&B accidentally swapped during IPHEX
-                    self.TB37B[index, i] = float(line_split[i+ 9+
-                                                 4*self.swath_size])
-                    self.TB37A[index, i] = float(line_split[i+ 9+
-                                                 5*self.swath_size])
-                    #Note: Currently (May 2014) Land_Fraction## is set to
-                    #bad data in IPHEX files
-                    #Terrain elevation data not recorded, instead incidence
-                    #angle is in its position
-                    self.Elevation[index, i] = self.bad_data
-                    #IPHEX incidence angle currently ignored by PyAMPR
-                    #self.Incidence_Angle[index, i] = float(line_split[i+27+13*self.swath_size])
-                
-                elif self.Project == 'MC3E':
-                    self._fill_2011onward_ampr_variables(line_split, index, i)
-                
-                else: #Pre-MC3E projects
-                    self._fill_pre2011_ampr_variables(line_split, index, i)
-       
-            if self.Project == 'IPHEX' or self.Project == 'MC3E':
-                #Aircraft_Nav out of order to improve efficiency for 2011+ projects
-                self._fill_2011onward_aircraft_info(line_split, index)
+                self.hasNav = False
+                        
+            # Get dimensions
+            nscans = len(level2b.dimensions['scan_number']);
+            ncross = len(level2b.dimensions['scan_position']);
+                    
+            # Handle the times.         
+            times = level2b.variables['time'];
+            # Convert to a datetime object
+            dtimes = num2date(times[:],times.units);
+            
+            self.netcdfTimes = times;
+            self.dateTimes=dtimes;        
+            
+            # Add the Scan and Swath information.
+            self.nscans = nscans;
+            self.ncross = ncross;
+            self.Scan = level2b.variables['scan_number'][:];
+            self.Scan_Position = level2b.variables['scan_position'][:];
+            self.swath_angle = level2b.variables['scan_angle'][:];
+            self.swath_left = self.swath_angle[0];
+            self.swath_size = ncross;
+            
+            # Before looping through the datetime object, initialize the 
+            # numpy arrays
+            self.Year = np.empty(nscans)*np.nan;
+            self.Month = np.empty(nscans)*np.nan;
+            self.Day = np.empty(nscans)*np.nan;
+            self.Day_of_Year = np.empty(nscans)*np.nan;
+            self.Hour = np.empty(nscans)*np.nan;
+            self.Minute = np.empty(nscans)*np.nan;
+            self.Second = np.empty(nscans)*np.nan;
+            self.Second_of_Day = np.empty(nscans)*np.nan;
+            self.Time_String =   np.zeros(nscans, dtype = 'a8');
     
-            #Increment to the next scan (last step in master loop)
-            index += 1
+            for icount in np.arange(nscans):
+                self.Year[icount] = dtimes[icount].year;
+                self.Month[icount] = dtimes[icount].month;
+                self.Day[icount] = dtimes[icount].day;
+                self.Day_of_Year[icount] = dtimes[icount].timetuple().tm_yday;
+                self.Hour[icount] = dtimes[icount].hour;
+                self.Minute[icount] = dtimes[icount].minute;
+                self.Second[icount] = dtimes[icount].second;
+                # Create a Time String and get Second of Data
+                self.Time_String[icount], self.Second_of_Day[icount] = _get_timestring_and_sod(self.Hour[icount], self.Minute[icount], self.Second[icount])
+            
+            # Compute Epoch Time
+            self._fill_epoch_time() #defines and populates self.Epoch_Time
+            
+            if self.hasNav:
+                # Add the geometry information
+                self.Latitude=level2b.variables['lat'][:,:];
+                self.Longitude=level2b.variables['lon'][:,:];
+                self.Incidence_Angle=level2b.variables['incidence_angle'][:,:];           
+                self.Relative_Azimuth=level2b.variables['relative_azimuth'][:,:];           
+                
+            # Add the Calibrated TBs
+            self.TB10A = level2b.variables['tbs_10a'][:,:];
+            self.TB10B = level2b.variables['tbs_10b'][:,:];
+            self.TB19A = level2b.variables['tbs_19a'][:,:];
+            self.TB19B = level2b.variables['tbs_19b'][:,:];
+            self.TB37A = level2b.variables['tbs_37a'][:,:];
+            self.TB37B = level2b.variables['tbs_37b'][:,:];
+            self.TB85A = level2b.variables['tbs_85a'][:,:];
+            self.TB85B = level2b.variables['tbs_85b'][:,:];
 
-        self._fill_epoch_time() #defines and populates self.Epoch_Time
+            # Other Variables -- Set to NaN for Now.            
+            self.Icon =            np.nan*np.empty(self.nscans, dtype = np.int32)
+            self.Noise10 =         np.nan*np.empty(self.nscans, dtype = 'float')
+            self.Noise19 =         np.nan*np.empty(self.nscans, dtype = 'float')
+            self.Noise37 =         np.nan*np.empty(self.nscans, dtype = 'float')
+            self.Noise85 =         np.nan*np.empty(self.nscans, dtype = 'float')    
+            self.Land_Fraction10 = np.nan*np.empty((self.nscans, self.swath_size), dtype = 'float')
+            self.Land_Fraction37 = np.nan*np.empty((self.nscans, self.swath_size), dtype = 'float')
+            self.Land_Fraction85 = np.nan*np.empty((self.nscans, self.swath_size), dtype = 'float')
+            self.Elevation =       np.nan*np.empty((self.nscans, self.swath_size), dtype = 'float')
+     
+            if self.hasNav:
+                # Now, return a dictionary of Aircraft_Nav parameters.
+                self.Aircraft_Nav={'GPS Latitude'  :  level2b.variables['gLat'][:] };
+                self.Aircraft_Nav['GPS Longitude'] =  level2b.variables['gLon'][:];
+                self.Aircraft_Nav['GPS Altitude'] =  level2b.variables['gAlt'][:];
+                self.Aircraft_Nav['Pitch'] =  level2b.variables['pitch'][:];
+                self.Aircraft_Nav['Roll'] =  level2b.variables['roll'][:];
+                self.Aircraft_Nav['Yaw'] =  level2b.variables['track_angle'][:];
+                self.Aircraft_Nav['Heading'] =  level2b.variables['heading'][:];
+                self.Aircraft_Nav['Ground Speed'] =  level2b.variables['groundSpeed'][:];
+                self.Aircraft_Nav['Air Speed'] =  level2b.variables['airSpeed'][:];
+                self.Aircraft_Nav['Static Pressure'] =  level2b.variables['staticPressure'][:];
+                self.Aircraft_Nav['Total Temperature'] =  level2b.variables['totalTemp'][:];
+                self.Aircraft_Nav['Wind Speed'] =  level2b.variables['iWindSpeed'][:];
+                self.Aircraft_Nav['Wind Direction'] =  level2b.variables['iWindDir'][:];
+                self.Aircraft_Nav['INS Latitude'] =  level2b.variables['iLat'][:];
+                self.Aircraft_Nav['INS Longitude'] =  level2b.variables['iLon'][:];
+    
+        else:
+            print "ASCII file supplied, treating as such"
+            
+            #Following puts entire file contents into self.ampr_string
+            read_successfully = self._read_ampr_ascii_file(full_path_and_filename)
+            if not read_successfully:
+                return
+    
+            #Assigning project name (self.Project) based on user input
+            self._assign_project_name(project)
+        
+            #Determine number of scans
+            self.nscans = np.size(self.ampr_string)
+            print 'Number of scans =', self.nscans
+        
+            #Hard-coding sizes of AMPR arrays and dictionaries
+            self._hard_code_ampr_array_sizes_and_other_metadata()
+            self._declare_ampr_variables()
+    
+            #Populate the variables with the file's data.
+            #Begin master loop
+            index = 0L
+            for line in self.ampr_string:
+                line_split = line.split()
+            
+                #Header info
+                if self.Project == 'IPHEX' or self.Project == 'MC3E':
+                    #2011+, header info placed before TBs
+                    self._fill_2011onward_header_info(line_split, index)
+                else:
+                    #All pre-MC3E projects, aircraft data placed with header
+                    #info before TBs
+                    self._fill_pre2011_header_and_aircraft_info(line_split, index)
+           
+                self.Time_String[index], self.Second_of_Day[index] =\
+                      _get_timestring_and_sod(self.Hour[index],
+                                    self.Minute[index], self.Second[index])
+            
+                #Get TBs, Latitudes, Longitudes, etc.
+                for i in xrange(self.swath_size):
+                    
+                    if self.Project == 'IPHEX':
+                        self._fill_2011onward_ampr_variables(line_split, index, i)
+                        #Below are IPHEX-specific fixes
+                        #37 GHZ A&B accidentally swapped during IPHEX
+                        self.TB37B[index, i] = float(line_split[i+ 9+
+                                                     4*self.swath_size])
+                        self.TB37A[index, i] = float(line_split[i+ 9+
+                                                     5*self.swath_size])
+                        #Note: Currently (May 2014) Land_Fraction## is set to
+                        #bad data in IPHEX files
+                        #Terrain elevation data not recorded, instead incidence
+                        #angle is in its position
+                        self.Elevation[index, i] = self.bad_data
+                        #IPHEX incidence angle currently ignored by PyAMPR
+                        #self.Incidence_Angle[index, i] = float(line_split[i+27+13*self.swath_size])
+                    
+                    elif self.Project == 'MC3E':
+                        self._fill_2011onward_ampr_variables(line_split, index, i)
+                    
+                    else: #Pre-MC3E projects
+                        self._fill_pre2011_ampr_variables(line_split, index, i)
+           
+                if self.Project == 'IPHEX' or self.Project == 'MC3E':
+                    #Aircraft_Nav out of order to improve efficiency for 2011+ projects
+                    self._fill_2011onward_aircraft_info(line_split, index)
+        
+                #Increment to the next scan (last step in master loop)
+                index += 1
+    
+            self._fill_epoch_time() #defines and populates self.Epoch_Time
+            
+        # END OF IF-THEN SWITH TO READ NETCDF OR ASCII FILE
+
+        # Replace unfilled data.        
         self._set_unfilled_data_to_bad()
         
         if self.Year[0] < 2011:
             print 'Only A channels available in this project\'s data'
+        
         print 'Done reading, data contained in class'
         print 'Use dir(), help(), or __dict__ to see what is available'
         _method_footer_printout()
-
+        
     #########################################
 
     def help(self):
@@ -866,9 +996,9 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         
         self.Epoch_Time = 0 * self.Second
         for i in xrange(self.nscans):
-            self.Epoch_Time[i] = calendar.timegm((self.Year[i], self.Month[i],
-                                            self.Day[i], self.Hour[i],
-                                            self.Minute[i], self.Second[i]))
+            self.Epoch_Time[i] = calendar.timegm((int(self.Year[i]), int(self.Month[i]),
+                                            int(self.Day[i]), int(self.Hour[i]),
+                                            int(self.Minute[i]), int(self.Second[i])));
 
     #########################################
 
