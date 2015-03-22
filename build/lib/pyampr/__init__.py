@@ -21,7 +21,7 @@ __author__ = "Timothy J. Lang"
 
 __email__ = "timothy.j.lang@nasa.gov"
 
-__version__ = "1.3.2"
+__version__ = "1.4.0"
 
 __doc__ = """pyampr v%s by %s
 

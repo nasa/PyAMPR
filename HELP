@@ -1,220 +1,226 @@
-Output from help(pyampr)
-------------------------
-Help on module pyampr:
+Help on package pyampr:
 
 NAME
-    pyampr
+    pyampr - pyampr v1.4.0 by Timothy J. Lang
 
 FILE
-    /Users/tjlang/Documents/AMPR/pyampr/pyampr_v1.3.2/pyampr/pyampr.py
+    /Users/tjlang/anaconda/lib/python2.7/site-packages/pyampr/__init__.py
 
-CLASSES
-    __builtin__.object
-        AmprTb
+DESCRIPTION
+    PyAMPR is a package to read, analyze, and display AMPR data
     
-    class AmprTb(__builtin__.object)
-     |  Methods defined here:
-     |  
-     |  __init__(self, full_path_and_filename=None, project='IPHEX')
-     |      If passed a filename, call the read_ampr_tb_level1b() method, 
-     |      otherwise just instance the class with nothing
-     |  
-     |  calc_polarization(self, simple=False, force_match=True, chan_list=['10', '19', '37', '85'])
-     |      *** THIS METHOD IS EXPERIMENTAL ***
-     |      
-     |      This method calculates H & V given the mixed-pol A & B channels.
-     |      Solves Equation 1 in Vivekanandan et al. (1993) for Tb in H and V.
-     |      Where A or B are not good will be populated with AmprTb.bad_data.
-     |      If successful, TB10H, TB10V, TB19H, TB19V, TB37H, TB37V, TB85H, TB85V 
-     |      will now be attributes of the AmprTb instance. Missing channels will
-     |      not be processed. Calculation performed via methodology of Brent Roberts.
-     |      
-     |      Creates attributes called TB##_offset, where ## is channel 
-     |      frequency (in GHz). This is Channel A TB - Channel B TB (in K) 
-     |      at nadir scan angle.
-     |      
-     |      Author: Brent Roberts w/ adjustments by Timothy Lang
-     |      
-     |      simple = Boolean flag to swap between simple linear substitution or 
-     |               constrained linear inversion.
-     |               (Default = constrained linear inversion)
-     |      force_match = Boolean flag to force A & B channels to match at nadir
-     |                    (Default = match forced)
-     |      chan_list = List of strings to enable individual freqs to be deconvolved
-     |                  using different methodologies (Default = All 4 freqs).
-     |  
-     |  help(self)
-     |  
-     |  plot_ampr_channels(self, scanrange=None, cmap=None, clevs=[75, 325], save=None, show_pol=False, timerange=None)
-     |      This method plots a strip chart akin to those seen here:
-     |      ftp://gpm.nsstc.nasa.gov/gpm_validation/mc3e/ampr/browse/
-     |      matplotlib.pyplot.pcolormesh() is the workhorse plotting routine
-     |      
-     |      clevs = List with contour levels. Only max and min values are used.
-     |      cmap = Colormap desired. 
-     |             See http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
-     |             and dir(cm) for more
-     |      save = Filename+path as string to save plot to. Type determined from suffix.
-     |             Careful - .ps/.eps/.pdf files can get huge!
-     |      scanrange = List of scan numbers (from AmprTb.Scan) to plot. 
-     |                  Only max/min are used.
-     |      show_pol = Set to True to show deconvolved H & V polarizations. Will call
-     |                 calc_polarization() beforehand if these channels are missing.
-     |      timerange = Time range to plot. Overrides scanrange if both are set.
-     |                  Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
-     |  
-     |  plot_ampr_track(self, var='10A', latrange=None, lonrange=None, parallels=2.0, meridians=2.0, title=None, clevs=[75, 325], cmap=None, save=None, show_track=False, maneuver=True, scanrange=None, show_grid=True, equator=False, timerange=None, return_flag=False)
-     |      This method plots geolocated AMPR data, along with the Aircraft track if
-     |      requested. matplotlib.pyplot.pcolormesh() on a Basemap is the workhorse 
-     |      plotting routine.
-     |      
-     |      var = String with channel number and letter (e.g., 10A for 10 GHz (A) channel
-     |      latrange = List with lat range defined. Order and size (>= 2) is irrelevant
-     |                 as max and min are retrieved
-     |      lonrange = List with lon range defined. Order and size (>= 2) is irrelevant
-     |                 as max and min are retrieved
-     |      parallels = Scalar spacing (deg) for parallels (i.e., constant latitude)
-     |      meridians = Scalar spacing (deg) for meridians (i.e., constant longitude)
-     |      ptitle = Plot title as string
-     |      clevs = List with contour levels. Only max and min values are used.
-     |      cmap = Colormap desired. See http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
-     |             and dir(cm) for more
-     |      save = Filename+path as string to save plot to. Type determined from suffix.
-     |             Careful - .ps/.eps/.pdf files can get huge!
-     |      show_track = Boolean to plot Aircraft track along with AMPR data. 
-     |                   Plotted in black with white highlights for significant maneuvers
-     |                   (abs(Aircraft_Nav['Roll']) > 5).
-     |      scanrange = List of scan numbers (from AmprTb.Scan) to plot. 
-     |                  Only max/min are used.
-     |      show_grid = Set to False to turn off gridlines
-     |      equator = Boolean to consider 0s/-1s in Latitude/Longitude as good geolocations
-     |                (e.g., flight crosses Equator or Prime Meridian).
-     |                Default is bad geolocations.
-     |      maneuver = Set to False to suppress the plotting of swaths during significant
-     |                 aircraft maneuvers.
-     |      timerange = Time range to plot. Overrides scanrange if both are set.
-     |                  Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
-     |      return_flag = Set to True to return Basemap, plot axes, etc. Order of items 
-     |                    returned is fig (figure instance), ax (main axis instance), 
-     |                    m (Basemap instance), cax (colorbar axis instance), 
-     |                    cbar (colorbar instance).
-     |  
-     |  read_ampr_tb_level1b(self, full_path_and_filename, project='IPHEX')
-     |      Reads Level 1B AMPR data in text files provided from
-     |      http://ghrc.msfc.nasa.gov. Tested and working with all AMPR
-     |      data from this site, as well as IPHEX. Depending on project,
-     |      some variables are unused or are duplicates. Most notably,
-     |      pre-MC3E there are no B channels.
-     |      
-     |      Currently available field projects: IPHEX, MC3E, TC4, TCSP, JAX90, COARE,
-     |      CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA, FIRE3ACE, CAPE
-     |      If you read one project's data while mistakenly telling PyAMPR the data 
-     |      are from a different project, then errors are likely.
-     |      
-     |      Notable attributes in output data class
-     |      ---------------------------------------
-     |      nscans = Number of scans (depends on file)
-     |      swath_size = 50 (hard coded)
-     |      nav_size =   18 (hard coded)
-     |      
-     |      shape = (nscans)
-     |      *****
-     |      Scan - Individual scan record number 
-     |             (usually thousands of scans per flight)
-     |      Year, Month, Day, Hour, Minute, Second, Day_of_Year, Second _of_Day - 
-     |          Scan timing info (UTC) 
-     |      Icon - QC flag (not currently used by PyAMPR)
-     |      
-     |      shape = (nscans, swath_size) 
-     |      *****
-     |      TB10A, TB10B - 10 GHz brightness temperatures 
-     |          (A: Left V -> Right H, B: Left H -> Right V, units: K)
-     |      TB19A, TB19B - 19 GHz brightness temperatures (V->H, H->V, K) 
-     |      TB37A, TB37B - 37 GHz brightness temperatures (V->H, H->V, K) 
-     |      TB85A, TB85B - 85 GHz brightness temperatures (V->H, H->V, K) 
-     |      Latitude, Longitude -  Geolocation for the AMPR beam (degrees) 
-     |      Land_Fraction10 - Estimated fraction of land in 10/19 GHz pixel 
-     |      Land_Fraction37 - Estimated fraction of land in 37 GHz pixel
-     |      Land_Fraction85 - Estimated fraction of land in 85 GHz pixel
-     |          (0 = All Ocean, 1 = All Land)
-     |      Elevation - Topographic elevation (m MSL)
-     |      
-     |      shape = (nscans, nav_size)
-     |      *****
-     |      Aircraft_Nav - Python dict of Aircraft navigation info: key (units)
-     |      GPS Latitude       (deg)
-     |      GPS Longitude      (deg)
-     |      GPS Altitude       (m MSL)
-     |      Pitch              (deg, + is nose up)
-     |      Roll               (deg, + is right wing down)
-     |      Yaw                (deg from N)
-     |      Heading            (deg from N) 
-     |      Ground Speed       (m/s)
-     |      Air Speed          (m/s)
-     |      Static Pressure    (hPa)
-     |      Total Pressure     (hPa)
-     |      Total Temperature  (C)
-     |      Static Temperature (C)
-     |      Wind Speed         (m/s)
-     |      Wind Direction     (deg from N)
-     |      INS Latitude       (deg)
-     |      INS Longitude      (deg)
-     |      INS Altitude       (m MSL)
-     |  
-     |  write_ampr_kmz(self, var='10A', latrange=None, lonrange=None, clevs=[75, 325], cmap=None, timerange=None, file_path=None, file_name=None, scanrange=None, show_legend=True, equator=False, maneuver=False)
-     |      This method plots geolocated AMPR data as a filled color Google Earth 
-     |      kmz. Qualitatively similar plot to plot_ampr_track() but for Google 
-     |      Earth.
-     |      Will produce overlay.png and, if a legend is created, 
-     |      legend.png as temporary image files in the current working 
-     |      directory.
-     |      
-     |      var = AMPR channel to plot (Default = DEFAULT_VAR)
-     |      scanrange = List of scan numbers (from AmprTb.Scan) to plot. 
-     |                  Only max/min are used.
-     |      file_path = Desired path to kmz file (Default = '')
-     |      file_name = Desired name for kmz file (Default = YYYYMMDD_TB###.kmz, 
-     |                  ### = channel)
-     |      latrange = List with lat range defined. Order and size (>= 2) 
-     |                 is irrelevant as max and min are retrieved
-     |      lonrange = List with lon range defined. Order and size (>= 2)
-     |                 is irrelevant as max and min are retrieved
-     |      clevs = List with contour levels. Only max and min values are used. 
-     |              (Default = DEFAULT_CLEVS)
-     |      cmap = Colormap desired. 
-     |             See http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
-     |             and dir(cm) for more
-     |      equator = Boolean to consider 0s/-1s in Latitude/Longitude as 
-     |                good geolocations
-     |                (e.g., flight crosses Equator or Prime Meridian).
-     |                Default is bad geolocations.
-     |      show_legend = Set to False to suppress the color bar
-     |      maneuver = Set to False to suppress plotting of swaths during
-     |                 significant aircraft maneuvers.
-     |      timerange = Time range to plot. Overrides scanrange if both are set.
-     |                  Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
-     |  
-     |  ----------------------------------------------------------------------
-     |  Data descriptors defined here:
-     |  
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |  
-     |  __weakref__
-     |      list of weak references to the object (if defined)
+    Please e-mail bug reports to: timothy.j.lang@nasa.gov
+
+PACKAGE CONTENTS
+    google_earth_tools
+    pyampr
+    udf_cmap
 
 DATA
-    CMAP_FLAG = True
-    DEFAULT_BAD_DATA = -999.0
-    DEFAULT_CHAN_LIST = ['10', '19', '37', '85']
-    DEFAULT_CLEVS = [75, 325]
-    DEFAULT_GRID_DEL = 2.0
-    DEFAULT_NAV_SIZE = 18
-    DEFAULT_PROJECT_NAME = 'IPHEX'
-    DEFAULT_SWATH_LEFT = 44.1
-    DEFAULT_SWATH_SIZE = 50
-    DEFAULT_VAR = '10A'
-    VERSION = '1.3.1'
-    amprTB_cmap = <matplotlib.colors.LinearSegmentedColormap object>
+    __author__ = 'Timothy J. Lang'
+    __email__ = 'timothy.j.lang@nasa.gov'
+    __version__ = '1.4.0'
 
-(END) 
+VERSION
+    1.4.0
+
+AUTHOR
+    Timothy J. Lang
+
+Help on class AmprTb in module pyampr.pyampr:
+
+class AmprTb(__builtin__.object)
+ |  Methods defined here:
+ |  
+ |  __init__(self, full_path_and_filename=None, project='IPHEX')
+ |      If passed a filename, call the read_ampr_tb_level2b() method, 
+ |      otherwise just instance the class with nothing
+ |  
+ |  calc_polarization(self, simple=False, force_match=True, chan_list=['10', '19', '37', '85'])
+ |      *** THIS METHOD IS EXPERIMENTAL ***
+ |      
+ |      This method calculates H & V given the mixed-pol A & B channels.
+ |      Solves Equation 1 in Vivekanandan et al. (1993) for Tb in H and V.
+ |      Where A or B are not good will be populated with AmprTb.bad_data.
+ |      If successful, TB10H, TB10V, TB19H, TB19V, TB37H, TB37V, TB85H, TB85V 
+ |      will now be attributes of the AmprTb instance. Missing channels will
+ |      not be processed. Calculation performed via methodology of Brent Roberts.
+ |      
+ |      Creates attributes called TB##_offset, where ## is channel 
+ |      frequency (in GHz). This is Channel A TB - Channel B TB (in K) 
+ |      at nadir scan angle.
+ |      
+ |      Author: Brent Roberts w/ adjustments by Timothy Lang
+ |      
+ |      simple = Boolean flag to swap between simple linear substitution or 
+ |               constrained linear inversion.
+ |               (Default = constrained linear inversion)
+ |      force_match = Boolean flag to force A & B channels to match at nadir
+ |                    (Default = match forced)
+ |      chan_list = List of strings to enable individual freqs to be deconvolved
+ |                  using different methodologies (Default = All 4 freqs).
+ |  
+ |  help(self)
+ |  
+ |  plot_ampr_channels(self, scanrange=None, cmap=None, clevs=[75, 325], save=None, show_pol=False, timerange=None)
+ |      This method plots a strip chart akin to those seen here:
+ |      ftp://gpm.nsstc.nasa.gov/gpm_validation/mc3e/ampr/browse/
+ |      matplotlib.pyplot.pcolormesh() is the workhorse plotting routine
+ |      
+ |      clevs = List with contour levels. Only max and min values are used.
+ |      cmap = Colormap desired. 
+ |             See http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
+ |             and dir(cm) for more
+ |      save = Filename+path as string to save plot to. Type determined from suffix.
+ |             Careful - .ps/.eps/.pdf files can get huge!
+ |      scanrange = List of scan numbers (from AmprTb.Scan) to plot. 
+ |                  Only max/min are used.
+ |      show_pol = Set to True to show deconvolved H & V polarizations. Will call
+ |                 calc_polarization() beforehand if these channels are missing.
+ |      timerange = Time range to plot. Overrides scanrange if both are set.
+ |                  Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
+ |  
+ |  plot_ampr_track(self, var='10A', latrange=None, lonrange=None, parallels=2.0, meridians=2.0, title=None, clevs=[75, 325], cmap=None, save=None, show_track=False, maneuver=True, scanrange=None, show_grid=True, equator=False, timerange=None, return_flag=False)
+ |      This method plots geolocated AMPR data, along with the Aircraft track if
+ |      requested. matplotlib.pyplot.pcolormesh() on a Basemap is the workhorse 
+ |      plotting routine.
+ |      
+ |      var = String with channel number and letter (e.g., 10A for 10 GHz (A) channel
+ |      latrange = List with lat range defined. Order and size (>= 2) is irrelevant
+ |                 as max and min are retrieved
+ |      lonrange = List with lon range defined. Order and size (>= 2) is irrelevant
+ |                 as max and min are retrieved
+ |      parallels = Scalar spacing (deg) for parallels (i.e., constant latitude)
+ |      meridians = Scalar spacing (deg) for meridians (i.e., constant longitude)
+ |      ptitle = Plot title as string
+ |      clevs = List with contour levels. Only max and min values are used.
+ |      cmap = Colormap desired. See http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
+ |             and dir(cm) for more
+ |      save = Filename+path as string to save plot to. Type determined from suffix.
+ |             Careful - .ps/.eps/.pdf files can get huge!
+ |      show_track = Boolean to plot Aircraft track along with AMPR data. 
+ |                   Plotted in black with white highlights for significant maneuvers
+ |                   (abs(Aircraft_Nav['Roll']) > 5).
+ |      scanrange = List of scan numbers (from AmprTb.Scan) to plot. 
+ |                  Only max/min are used.
+ |      show_grid = Set to False to turn off gridlines
+ |      equator = Boolean to consider 0s/-1s in Latitude/Longitude as good geolocations
+ |                (e.g., flight crosses Equator or Prime Meridian).
+ |                Default is bad geolocations.
+ |      maneuver = Set to False to suppress the plotting of swaths during significant
+ |                 aircraft maneuvers.
+ |      timerange = Time range to plot. Overrides scanrange if both are set.
+ |                  Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
+ |      return_flag = Set to True to return Basemap, plot axes, etc. Order of items 
+ |                    returned is fig (figure instance), ax (main axis instance), 
+ |                    m (Basemap instance), cax (colorbar axis instance), 
+ |                    cbar (colorbar instance).
+ |  
+ |  read_ampr_tb_level2b(self, full_path_and_filename, project='IPHEX')
+ |      Reads Level 2B AMPR data in text or netCDF files provided from
+ |      http://ghrc.msfc.nasa.gov. Tested and working with all AMPR
+ |      data from this site, as well as IPHEX. Depending on project,
+ |      some variables are unused or are duplicates. Most notably,
+ |      pre-MC3E there are no B channels.
+ |      
+ |      Currently available field projects: IPHEX, MC3E, TC4, TCSP, JAX90, COARE,
+ |      CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA, FIRE3ACE, CAPE
+ |      If you read one project's data while mistakenly telling PyAMPR the data 
+ |      are from a different project, then errors are likely.
+ |      
+ |      Notable attributes in output data class
+ |      (Note - Order in documentation does not necessarily match order in data files)
+ |      ---------------------------------------
+ |      nscans = Number of scans (depends on file)
+ |      swath_size = 50 (hard coded)
+ |      nav_size =   18 (hard coded)
+ |      
+ |      shape = (nscans)
+ |      *****
+ |      Scan - Individual scan record number 
+ |             (usually thousands of scans per flight)
+ |      Year, Month, Day, Hour, Minute, Second, Day_of_Year, Second _of_Day - 
+ |          Scan timing info (UTC) 
+ |      Icon - QC flag (not currently used by PyAMPR)
+ |      
+ |      shape = (nscans, swath_size) 
+ |      *****
+ |      TB10A, TB10B - 10 GHz brightness temperatures 
+ |          (A: Left V -> Right H, B: Left H -> Right V, units: K)
+ |      TB19A, TB19B - 19 GHz brightness temperatures (V->H, H->V, K) 
+ |      TB37A, TB37B - 37 GHz brightness temperatures (V->H, H->V, K) 
+ |      TB85A, TB85B - 85 GHz brightness temperatures (V->H, H->V, K) 
+ |      Latitude, Longitude -  Geolocation for the AMPR beam (degrees) 
+ |      Land_Fraction10 - Estimated fraction of land in 10/19 GHz pixel 
+ |      Land_Fraction37 - Estimated fraction of land in 37 GHz pixel
+ |      Land_Fraction85 - Estimated fraction of land in 85 GHz pixel
+ |          (0 = All Ocean, 1 = All Land)
+ |      Elevation - Topographic elevation (m MSL)
+ |      
+ |      shape = (nscans, nav_size)
+ |      *****
+ |      Aircraft_Nav - Python dict of Aircraft navigation info: key (units)
+ |      GPS Latitude       (deg)
+ |      GPS Longitude      (deg)
+ |      GPS Altitude       (m MSL)
+ |      Pitch              (deg, + is nose up)
+ |      Roll               (deg, + is right wing down)
+ |      Yaw                (deg from N)
+ |      Heading            (deg from N) 
+ |      Ground Speed       (m/s)
+ |      Air Speed          (m/s)
+ |      Static Pressure    (hPa)
+ |      Total Pressure     (hPa)
+ |      Total Temperature  (C)
+ |      Static Temperature (C)
+ |      Wind Speed         (m/s)
+ |      Wind Direction     (deg from N)
+ |      INS Latitude       (deg)
+ |      INS Longitude      (deg)
+ |      INS Altitude       (m MSL) 
+ |      
+ |      Version 1.4.0: Added support for Level 2B netCDF files. Starting with IPHEX,
+ |      processed AMPR instrument files will be provided in a netCDF-4 format.
+ |  
+ |  write_ampr_kmz(self, var='10A', latrange=None, lonrange=None, clevs=[75, 325], cmap=None, timerange=None, file_path=None, file_name=None, scanrange=None, show_legend=True, equator=False, maneuver=True)
+ |      This method plots geolocated AMPR data as a filled color Google Earth 
+ |      kmz. Qualitatively similar plot to plot_ampr_track() but for Google 
+ |      Earth.
+ |      Will produce overlay.png and, if a legend is created, 
+ |      legend.png as temporary image files in the current working 
+ |      directory.
+ |      
+ |      var = AMPR channel to plot (Default = DEFAULT_VAR)
+ |      scanrange = List of scan numbers (from AmprTb.Scan) to plot. 
+ |                  Only max/min are used.
+ |      file_path = Desired path to kmz file (Default = '')
+ |      file_name = Desired name for kmz file (Default = YYYYMMDD_TB###.kmz, 
+ |                  ### = channel)
+ |      latrange = List with lat range defined. Order and size (>= 2) 
+ |                 is irrelevant as max and min are retrieved
+ |      lonrange = List with lon range defined. Order and size (>= 2)
+ |                 is irrelevant as max and min are retrieved
+ |      clevs = List with contour levels. Only max and min values are used. 
+ |              (Default = DEFAULT_CLEVS)
+ |      cmap = Colormap desired. 
+ |             See http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
+ |             and dir(cm) for more
+ |      equator = Boolean to consider 0s/-1s in Latitude/Longitude as 
+ |                good geolocations
+ |                (e.g., flight crosses Equator or Prime Meridian).
+ |                Default is bad geolocations.
+ |      show_legend = Set to False to suppress the color bar
+ |      maneuver = Set to False to suppress plotting of swaths during
+ |                 significant aircraft maneuvers.
+ |      timerange = Time range to plot. Overrides scanrange if both are set.
+ |                  Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
+ |  
+ |  ----------------------------------------------------------------------
+ |  Data descriptors defined here:
+ |  
+ |  __dict__
+ |      dictionary for instance variables (if defined)
+ |  
+ |  __weakref__
+ |      list of weak references to the object (if defined)
+
