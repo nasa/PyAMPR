@@ -7,6 +7,7 @@ import calendar
 import gzip
 import codecs
 from google_earth_tools import gearth_fig, make_kml
+from netCDF4 import Dataset, num2date, date2num
 
 try:
     from udf_cmap import amprTB_cmap
@@ -14,7 +15,7 @@ try:
 except ImportError:
     CMAP_FLAG = False
 
-VERSION = '1.3.2'
+VERSION = '1.4.0'
 
 #Fixed constants used by PyAMPR set here
 DEFAULT_CLEVS = [75, 325]
@@ -24,7 +25,7 @@ DEFAULT_CHAN_LIST = ['10', '19', '37', '85']
 DEFAULT_SWATH_SIZE = 50
 DEFAULT_NAV_SIZE = 18
 DEFAULT_BAD_DATA = -999.0
-DEFAULT_SWATH_LEFT = 44.1
+DEFAULT_SWATH_LEFT = -44.1
 DEFAULT_PROJECT_NAME = 'IPHEX'
 
 ######################
@@ -35,25 +36,22 @@ class AmprTb(object):
 
     def __init__(self, full_path_and_filename=None,
                  project=DEFAULT_PROJECT_NAME):
-
         """
-If passed a filename, call the read_ampr_tb_level1b() method, 
+If passed a filename, call the read_ampr_tb_level2b() method, 
 otherwise just instance the class with nothing
 
         """
-
         if full_path_and_filename == None:
-           print 'Class instantiated, call read_ampr_tb_level1b() to populate'
+           print 'Class instantiated, call read_ampr_tb_level2b() to populate'
         else:
-            self.read_ampr_tb_level1b(full_path_and_filename, project=project)
+            self.read_ampr_tb_level2b(full_path_and_filename, project=project)
     
     #########################################
 
-    def read_ampr_tb_level1b(self, full_path_and_filename,
+    def read_ampr_tb_level2b(self, full_path_and_filename,
                              project=DEFAULT_PROJECT_NAME):
-
         """
-Reads Level 1B AMPR data in text files provided from
+Reads Level 2B AMPR data in text or netCDF files provided from
 http://ghrc.msfc.nasa.gov. Tested and working with all AMPR
 data from this site, as well as IPHEX. Depending on project,
 some variables are unused or are duplicates. Most notably,
@@ -115,88 +113,20 @@ INS Latitude       (deg)
 INS Longitude      (deg)
 INS Altitude       (m MSL) 
 
+Version 1.4.0: Added support for Level 2B netCDF files. Starting with IPHEX,
+processed AMPR instrument files will be provided in a netCDF-4 format.
+
         """
-
-        #Read the file contents as a string
         _method_header_printout()
-        print 'read_ampr_tb_level1b(): Reading', full_path_and_filename
-        
-        #Following puts entire file contents into self.ampr_string
-        read_successfully = self._read_ampr_ascii_file(full_path_and_filename)
-        if not read_successfully:
-            return
-
-        #Assigning project name (self.Project) based on user input
-        self._assign_project_name(project)
-    
-        #Determine number of scans
-        self.nscans = np.size(self.ampr_string)
-        print 'Number of scans =', self.nscans
-    
-        #Hard-coding sizes of AMPR arrays and dictionaries
-        self._hard_code_ampr_array_sizes_and_other_metadata()
-        self._declare_ampr_variables()
-
-        #Populate the variables with the file's data.
-        #Begin master loop
-        index = 0L
-        for line in self.ampr_string:
-            line_split = line.split()
-        
-            #Header info
-            if self.Project == 'IPHEX' or self.Project == 'MC3E':
-                #2011+, header info placed before TBs
-                self._fill_2011onward_header_info(line_split, index)
-            else:
-                #All pre-MC3E projects, aircraft data placed with header
-                #info before TBs
-                self._fill_pre2011_header_and_aircraft_info(line_split, index)
-       
-            self.Time_String[index], self.Second_of_Day[index] =\
-                  _get_timestring_and_sod(self.Hour[index],
-                                self.Minute[index], self.Second[index])
-        
-            #Get TBs, Latitudes, Longitudes, etc.
-            for i in xrange(self.swath_size):
-                
-                if self.Project == 'IPHEX':
-                    self._fill_2011onward_ampr_variables(line_split, index, i)
-                    #Below are IPHEX-specific fixes
-                    #37 GHZ A&B accidentally swapped during IPHEX
-                    self.TB37B[index, i] = float(line_split[i+ 9+
-                                                 4*self.swath_size])
-                    self.TB37A[index, i] = float(line_split[i+ 9+
-                                                 5*self.swath_size])
-                    #Note: Currently (May 2014) Land_Fraction## is set to
-                    #bad data in IPHEX files
-                    #Terrain elevation data not recorded, instead incidence
-                    #angle is in its position
-                    self.Elevation[index, i] = self.bad_data
-                    #IPHEX incidence angle currently ignored by PyAMPR
-                    #self.Incidence_Angle[index, i] = float(line_split[i+27+13*self.swath_size])
-                
-                elif self.Project == 'MC3E':
-                    self._fill_2011onward_ampr_variables(line_split, index, i)
-                
-                else: #Pre-MC3E projects
-                    self._fill_pre2011_ampr_variables(line_split, index, i)
-       
-            if self.Project == 'IPHEX' or self.Project == 'MC3E':
-                #Aircraft_Nav out of order to improve efficiency for 2011+ projects
-                self._fill_2011onward_aircraft_info(line_split, index)
-    
-            #Increment to the next scan (last step in master loop)
-            index += 1
-
-        self._fill_epoch_time() #defines and populates self.Epoch_Time
-        self._set_unfilled_data_to_bad()
-        
-        if self.Year[0] < 2011:
-            print 'Only A channels available in this project\'s data'
-        print 'Done reading, data contained in class'
-        print 'Use dir(), help(), or __dict__ to see what is available'
+        print 'read_ampr_tb_level2b(): Reading', full_path_and_filename
+            
+        try:
+            self._read_level2b_netcdf(full_path_and_filename, project=project)
+        except:
+            print 'Not netCDF file, trying ASCII read ...'
+            self._read_level2b_ascii(full_path_and_filename, project=project)
         _method_footer_printout()
-
+    
     #########################################
 
     def help(self):
@@ -246,7 +176,6 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
               returned is fig (figure instance), ax (main axis instance), 
               m (Basemap instance), cax (colorbar axis instance), 
               cbar (colorbar instance).
-
         """
 
         plt.close() #mpl seems buggy if you don't clean up old windows
@@ -409,9 +338,8 @@ timerange = Time range to plot. Overrides scanrange if both are set.
         colormap = self._get_colormap(cmap, CMAP_FLAG)
 
         #Loop and plot available channels
-        index = 0
         itest = 0
-        for chan in tb_list:
+        for index, chan in enumerate(tb_list):
             if hasattr(self, 'TB'+chan):
                 itest = itest + 1
                 var = np.transpose(getattr(self, 'TB'+chan))
@@ -448,9 +376,6 @@ timerange = Time range to plot. Overrides scanrange if both are set.
                         indt = np.where(self.Scan == t)
                         new_labels.append(''.join(self.Time_String[indt[0]]))
                     axes[index].set_xticklabels(new_labels)
-                
-            #Increment to next axis - last step in for loop
-            index = index + 1
 
         #Check if missing too much data!
         if itest == 0:
@@ -515,7 +440,6 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             using different methodologies (Default = All 4 freqs).
 
         """
-        
         begin_time = time.time()
         _method_header_printout()
         print 'calc_polarization():'
@@ -537,8 +461,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                 
                 #Get angular argument and convert to radians.
                 #angle = np.deg2rad(data.Incidence_Angle - 45.0);
-                angle = np.deg2rad(np.linspace(-1.0*self.swath_left,
-                                   self.swath_left, self.swath_size) - 45.0)
+                angle = np.deg2rad(np.linspace(self.swath_left,
+                                   -1.0*self.swath_left, self.swath_size) - 45.0)
 
                 #There appears to be an offset between the mixed-pol
                 #brightness temperatures at 0-deg incidence angle.
@@ -610,9 +534,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                    significant aircraft maneuvers.
         timerange = Time range to plot. Overrides scanrange if both are set.
                     Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
-        
         """
-    
         plt.close() #mpl seems buggy if multiple windows are left open
         _method_header_printout()
         print 'write_ampr_kmz():'
@@ -684,15 +606,218 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     #Internal methods below here. Average user can stop reading now.
     ################################################################
 
+    def _read_level2b_netcdf(self, inputFile, project=DEFAULT_PROJECT_NAME):
+        """Internal method to read new L2 netCDF-format AMPR data files"""
+        # Open the data
+        level2b = Dataset(inputFile , mode="r")
+    
+        # Set bad data and nav_size
+        self.bad_data = DEFAULT_BAD_DATA
+        self.nav_size = DEFAULT_NAV_SIZE
+
+        #Assigning project name (self.Project) based on user input
+        self._assign_project_name(project)
+    
+        # Check for navigation
+        if 'lat' in level2b.variables.keys():
+            print "Found Navigation Data!"
+            self.hasNav = True
+        else:
+            self.hasNav = False
+
+        # Handle the times.
+        # Convert to a datetime object
+        self.netcdfTimes = level2b.variables['time']
+        self.dateTimes = num2date(self.netcdfTimes[:], self.netcdfTimes.units)
+        
+        # Add the Scan and Swath information.
+        self.nscans = len(level2b.dimensions['scan_number'])
+        self.ncross = len(level2b.dimensions['scan_position'])
+        self.Scan = level2b.variables['scan_number'][:]
+        self.Scan_Position = level2b.variables['scan_position'][:]
+        self.swath_angle = level2b.variables['scan_angle'][:]
+        self.swath_left = self.swath_angle[0]
+        self.swath_size = self.ncross
+        
+        # Before looping through the datetime object, initialize the numpy arrays
+        self.Year = np.zeros(self.nscans, dtype=np.int32)
+        self.Month = np.zeros(self.nscans, dtype=np.int32)
+        self.Day = np.zeros(self.nscans, dtype=np.int32)
+        self.Day_of_Year = np.zeros(self.nscans, dtype=np.int32)
+        self.Hour = np.zeros(self.nscans, dtype=np.int32)
+        self.Minute = np.zeros(self.nscans, dtype=np.int32)
+        self.Second = np.zeros(self.nscans, dtype=np.int32)
+        self.Second_of_Day = np.zeros(self.nscans, dtype=np.int32)
+        self.Time_String = np.zeros(self.nscans, dtype='a8')
+        
+        for icount in np.arange(self.nscans):
+            self.Year[icount] = np.int32(self.dateTimes[icount].year)
+            self.Month[icount] = np.int32(self.dateTimes[icount].month)
+            self.Day[icount] = np.int32(self.dateTimes[icount].day)
+            self.Day_of_Year[icount] = \
+                             np.int32(self.dateTimes[icount].timetuple().tm_yday)
+            self.Hour[icount] = np.int32(self.dateTimes[icount].hour)
+            self.Minute[icount] = np.int32(self.dateTimes[icount].minute)
+            self.Second[icount] = np.int32(self.dateTimes[icount].second)
+            # Create a Time String and get Second of Data
+            self.Time_String[icount], self.Second_of_Day[icount] = \
+                _get_timestring_and_sod(self.Hour[icount], self.Minute[icount],
+                                        self.Second[icount])
+            
+        # Compute Epoch Time
+        self._fill_epoch_time() #defines and populates self.Epoch_Time
+            
+        if self.hasNav:
+            # Add the geomedateTimes information
+            self.Latitude = level2b.variables['lat'][:,:]
+            self.Longitude = level2b.variables['lon'][:,:]
+            self.Incidence_Angle = level2b.variables['incidence_angle'][:,:]
+            self.Relative_Azimuth = level2b.variables['relative_azimuth'][:,:]
+        
+        # Add the Calibrated TBs
+        self.TB10A = level2b.variables['tbs_10a'][:,:]
+        self.TB10B = level2b.variables['tbs_10b'][:,:]
+        self.TB19A = level2b.variables['tbs_19a'][:,:]
+        self.TB19B = level2b.variables['tbs_19b'][:,:]
+        #37 GHz A & B accidentally swapped during IPHEX
+        if self.Project == 'IPHEX':
+            self.TB37A = level2b.variables['tbs_37b'][:,:]
+            self.TB37B = level2b.variables['tbs_37a'][:,:]
+        else:
+            self.TB37A = level2b.variables['tbs_37a'][:,:]
+            self.TB37B = level2b.variables['tbs_37b'][:,:]
+        self.TB85A = level2b.variables['tbs_85a'][:,:]
+        self.TB85B = level2b.variables['tbs_85b'][:,:]
+
+        # Other Variables -- Set to bad data for now.
+        self.Icon = self.bad_data * np.ones(self.nscans, dtype = np.int32)
+        self.Noise10 = self.bad_data * np.ones(self.nscans, dtype = 'float')
+        self.Noise19 = self.bad_data * np.ones(self.nscans, dtype = 'float')
+        self.Noise37 = self.bad_data * np.ones(self.nscans, dtype = 'float')
+        self.Noise85 = self.bad_data * np.ones(self.nscans, dtype = 'float')
+        self.Land_Fraction10 = self.bad_data * np.ones((self.nscans,
+                                      self.swath_size), dtype = 'float')
+        self.Land_Fraction37 = self.bad_data * np.ones((self.nscans,
+                                      self.swath_size), dtype = 'float')
+        self.Land_Fraction85 = self.bad_data * np.ones((self.nscans,
+                                      self.swath_size), dtype = 'float')
+        self.Elevation = self.bad_data * np.ones((self.nscans,
+                                      self.swath_size), dtype = 'float')
+     
+        self._initialize_aircraft_dict()
+        for var in self.Aircraft_varlist:
+            self.Aircraft_Nav[var][:] = self.bad_data
+        if self.hasNav:
+            # Now, return a structured array of Aircraft_Nav parameters.
+            print np.shape(level2b.variables['gLat'])
+            self.Aircraft_Nav['GPS Latitude'] = level2b.variables['gLat'][:]
+            self.Aircraft_Nav['GPS Longitude'] = level2b.variables['gLon'][:]
+            self.Aircraft_Nav['GPS Altitude'] = level2b.variables['gAlt'][:]
+            self.Aircraft_Nav['Pitch'] = level2b.variables['pitch'][:]
+            self.Aircraft_Nav['Roll'] = level2b.variables['roll'][:]
+            self.Aircraft_Nav['Yaw'] = level2b.variables['track_angle'][:]
+            self.Aircraft_Nav['Heading'] =  level2b.variables['heading'][:]
+            self.Aircraft_Nav['Ground Speed'] = \
+                                  level2b.variables['groundSpeed'][:]
+            self.Aircraft_Nav['Air Speed'] = level2b.variables['airSpeed'][:]
+            self.Aircraft_Nav['Static Pressure'] = \
+                                  level2b.variables['staticPressure'][:]
+            self.Aircraft_Nav['Total Temperature'] = \
+                                  level2b.variables['totalTemp'][:]
+            self.Aircraft_Nav['Wind Speed'] = \
+                                  level2b.variables['iWindSpeed'][:]
+            self.Aircraft_Nav['Wind Direction'] = \
+                                  level2b.variables['iWindDir'][:]
+            self.Aircraft_Nav['INS Latitude'] = level2b.variables['iLat'][:]
+            self.Aircraft_Nav['INS Longitude'] = level2b.variables['iLon'][:]
+
+    #########################################
+
+    def _read_level2b_ascii(self, full_path_and_filename,
+                             project=DEFAULT_PROJECT_NAME):
+        
+        #Following puts entire file contents into self.ampr_string
+        read_successful = self._read_ampr_ascii_file(full_path_and_filename)
+        if not read_successful:
+            return
+    
+        #Assigning project name (self.Project) based on user input
+        self._assign_project_name(project)
+        
+        #Determine number of scans
+        self.nscans = np.size(self.ampr_string)
+        print 'Number of scans =', self.nscans
+        
+        #Hard-coding sizes of AMPR arrays and dictionaries
+        self._hard_code_ampr_array_sizes_and_other_metadata()
+        self._declare_ampr_variables()
+    
+        #Populate the variables with the file's data.
+        #Begin master loop
+        for index, line in enumerate(self.ampr_string):
+            line_split = line.split()
+            
+            #Header info
+            if self.Project == 'IPHEX' or self.Project == 'MC3E':
+                #2011+, header info placed before TBs
+                self._fill_2011on_header_info(line_split, index)
+            else:
+                #All pre-MC3E projects, aircraft data placed with header
+                #info before TBs
+                self._fill_pre2011_header_and_aircraft_info(line_split,
+                                                            index)
+           
+            self.Time_String[index], self.Second_of_Day[index] =\
+                      _get_timestring_and_sod(self.Hour[index],
+                                    self.Minute[index], self.Second[index])
+            
+            #Get TBs, Latitudes, Longitudes, etc.
+            for i in xrange(self.swath_size):
+                
+                if self.Project == 'IPHEX':
+                    self._fill_2011on_ampr_variables(line_split, index, i)
+                    #Below are IPHEX-specific fixes
+                    #37 GHZ A&B accidentally swapped during IPHEX
+                    self.TB37B[index, i] = float(line_split[i+ 9+
+                                                 4*self.swath_size])
+                    self.TB37A[index, i] = float(line_split[i+ 9+
+                                                 5*self.swath_size])
+                    #Note: Currently (May 2014) Land_Fraction## is set to
+                    #bad data in IPHEX files
+                    #Terrain elevation data not recorded, instead incidence
+                    #angle is in its position
+                    self.Elevation[index, i] = self.bad_data
+                    #IPHEX incidence angle currently ignored by PyAMPR
+                    #self.Incidence_Angle[index, i] = float(line_split[i
+                    #+27+13*self.swath_size])
+                    
+                elif self.Project == 'MC3E':
+                    self._fill_2011on_ampr_variables(line_split, index, i)
+                    
+                else: #Pre-MC3E projects
+                    self._fill_pre2011_ampr_variables(line_split, index, i)
+           
+            if self.Project == 'IPHEX' or self.Project == 'MC3E':
+                #Aircraft_Nav out of order to improve efficiency for 2011+ projects
+                self._fill_2011on_aircraft_info(line_split, index)
+    
+        self._fill_epoch_time() #defines and populates self.Epoch_Time
+
+        # Replace unfilled data.        
+        self._set_unfilled_data_to_bad()
+        if self.Year[0] < 2011:
+            print 'Only A channels available in this project\'s data'
+
+    #########################################
+
     def _filter_bad_geolocations(self, plon=None, plat=None, zdata=None,
                                  equator=False):
 
         """
         Internal method to filter bad geolocation data. Called by the following:
         plot_ampr_track()
-        write_ampr_kml()
         write_ampr_kmz()
-        
+
         """
         
         #Attempt to deal with bad geolocation data
@@ -845,8 +970,13 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self.TB37B = np.zeros((self.nscans, self.swath_size), dtype = 'float')
         self.TB85A = np.zeros((self.nscans, self.swath_size), dtype = 'float')
         self.TB85B = np.zeros((self.nscans, self.swath_size), dtype = 'float')
+        #Aircraft Nav
+        self._initialize_aircraft_dict()
 
-        #Aircraft Navgation info
+    #########################################
+
+    def _initialize_aircraft_dict(self):
+        """Aircraft Navgation info"""
         self.Aircraft_varlist = ['GPS Latitude', 'GPS Longitude',
                                  'GPS Altitude', 'Pitch', 'Roll',
                                  'Yaw', 'Heading', 'Ground Speed',
@@ -866,9 +996,10 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         
         self.Epoch_Time = 0 * self.Second
         for i in xrange(self.nscans):
-            self.Epoch_Time[i] = calendar.timegm((self.Year[i], self.Month[i],
-                                            self.Day[i], self.Hour[i],
-                                            self.Minute[i], self.Second[i]))
+            self.Epoch_Time[i] = calendar.timegm((int(self.Year[i]),
+                                 int(self.Month[i]), int(self.Day[i]),
+                                 int(self.Hour[i]), int(self.Minute[i]),
+                                 int(self.Second[i])))
 
     #########################################
 
@@ -877,7 +1008,6 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         """
         Vectorizing remaining data assignments for unused/duplicate variables
         Project dependent which variables are or are not used
-        
         """
         if self.Project == 'IPHEX' or self.Project == 'MC3E':
             self.Noise10[:] = self.bad_data
@@ -960,7 +1090,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     #########################################
     
-    def _fill_2011onward_header_info(self, line_split=None, index=None):
+    def _fill_2011on_header_info(self, line_split=None, index=None):
     
         self.Scan[index] =        long(line_split[0])
         self.Year[index] =        long(line_split[1])
@@ -1022,7 +1152,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     #########################################
 
-    def _fill_2011onward_ampr_variables(self, line_split=None, index=None,
+    def _fill_2011on_ampr_variables(self, line_split=None, index=None,
                                         i=None):
     
         """
@@ -1053,13 +1183,10 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     #########################################
 
     def _fill_pre2011_ampr_variables(self, line_split=None, index=None, i=None):
-        
         """
         Data written out left to right; i=0 is Left edge, 
         i=49 is Right edge
-        
         """
-        
         self.TB10A    [index, i] = float(line_split[i+ 19                   ])
         self.TB19A    [index, i] = float(line_split[i+ 19+   self.swath_size])
         self.TB37A    [index, i] = float(line_split[i+ 19+ 2*self.swath_size])
@@ -1111,7 +1238,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     #########################################
 
-    def _fill_2011onward_aircraft_info(self, line_split, index):
+    def _fill_2011on_aircraft_info(self, line_split, index):
     
         aircraft_i = 0L
         for name in self.Aircraft_varlist:
