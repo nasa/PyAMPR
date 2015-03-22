@@ -1,6 +1,15 @@
 Change Log
 ----------
-v1.3.2 major changes:
+v1.4 major changes (03/22/2015):
+1. Added support for Level 2B netCDF files. Starting with IPHEX,
+   processed AMPR instrument files will be provided in a netCDF-4 format. 
+2. Renamed read_ampr_tb_leve1b to read_ampr_tb_level2b. Technically, the published
+   AMPR data are Level 2B, and Level 1B data consist of pre-QC’d lower-level data. 
+3. Swapped to standard AMPR convention for AmprTb.swath_angle and AmprTb.swath_left.
+   Now go from -44.1 to 44.1 deg from left to right. Note AMPR scans right to left 
+   but by convention reports its data left to right.
+
+v1.3.2 major changes (09/24/2014):
 1. Deleted write_ampr_kml method from AmprTb and all associated helper functions in 
    google_earth_tools.
 2. Removed private but dead code.
