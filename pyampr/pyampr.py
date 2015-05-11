@@ -730,6 +730,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                                   level2b.variables['iWindDir'][:]
             self.Aircraft_Nav['INS Latitude'] = level2b.variables['iLat'][:]
             self.Aircraft_Nav['INS Longitude'] = level2b.variables['iLon'][:]
+        self._remove_nan_inf()
 
     #########################################
 
@@ -1032,9 +1033,15 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             #Only one Land_Fraction variable with old projects
             self.Land_Fraction37[:,:] = self.bad_data
             self.Land_Fraction85[:,:] = self.bad_data
+        self._remove_nan_inf()
 
-        #Attempting to control for infinite numbers.
-        #They blow up plot_ampr_track() and write_ampr_kmz().
+    #########################################
+
+    def _remove_nan_inf(self):
+        """
+        Attempting to control for infinite numbers.
+        They can blow up plot_ampr_track() and write_ampr_kmz().
+        """
         self.TB10A[np.isinf(self.TB10A) == True] = self.bad_data
         self.TB10B[np.isinf(self.TB10A) == True] = self.bad_data
         self.TB19A[np.isinf(self.TB19A) == True] = self.bad_data
@@ -1043,7 +1050,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self.TB37B[np.isinf(self.TB37B) == True] = self.bad_data
         self.TB85A[np.isinf(self.TB85A) == True] = self.bad_data
         self.TB85B[np.isinf(self.TB85B) == True] = self.bad_data
-        self.Latitude [np.isinf(self.Latitude)  == True] = self.bad_data
+        self.Latitude[np.isinf(self.Latitude)  == True] = self.bad_data
         self.Longitude[np.isinf(self.Longitude) == True] = self.bad_data
         #Attempting to control for NaNs.
         #They blow up plot_ampr_track() and write_ampr_kmz().
@@ -1055,7 +1062,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self.TB37B[np.isnan(self.TB37B) == True] = self.bad_data
         self.TB85A[np.isnan(self.TB85A) == True] = self.bad_data
         self.TB85B[np.isnan(self.TB85B) == True] = self.bad_data
-        self.Latitude [np.isnan(self.Latitude)  == True] = self.bad_data
+        self.Latitude[np.isnan(self.Latitude)  == True] = self.bad_data
         self.Longitude[np.isnan(self.Longitude) == True] = self.bad_data
 
     #########################################
