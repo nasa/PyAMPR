@@ -67,5 +67,7 @@ rundown on the data structure.
 
 A demonstration IPython notebook can be found in the notebooks directory.
 
+A simple interactive testing notebook is available in the test directory.
+
 The following conference presentation describes PyAMPR (among other modules):
 https://ams.confex.com/ams/95Annual/webprogram/Paper262779.html
