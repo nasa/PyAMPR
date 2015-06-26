@@ -1,7 +1,7 @@
 Title/Version
 -------------
-Python AMPR Data Toolkit (PyAMPR) v1.4
-Last changed 03/22/2015
+Python AMPR Data Toolkit (PyAMPR) v1.4.1
+Last changed 06/26/2015
 
 
 Lead Author
