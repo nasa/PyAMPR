@@ -1,7 +1,7 @@
 Title/Version
 -------------
-Python AMPR Data Toolkit (PyAMPR) v1.4
-Last changed 03/22/2015
+Python AMPR Data Toolkit (PyAMPR) v1.4.1
+Last changed 06/26/2015
 
 
 Lead Author
@@ -66,6 +66,8 @@ In particular, 'help(pyampr.AmprTb.read_ampr_tb_level2b)' will give a full
 rundown on the data structure.
 
 A demonstration IPython notebook can be found in the notebooks directory.
+
+A simple interactive testing notebook is available in the test directory.
 
 The following conference presentation describes PyAMPR (among other modules):
 https://ams.confex.com/ams/95Annual/webprogram/Paper262779.html

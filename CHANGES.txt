@@ -1,5 +1,9 @@
 Change Log
 ----------
+v1.4.1 major changes (06/26/2015):
+1. Updated netCDF read routines to be able to handle lab data with no geolocations.
+2. Refactoring to better compartmentalize netCDF read routines.
+
 v1.4 major changes (03/22/2015):
 1. Added support for Level 2B netCDF files. Starting with IPHEX,
    processed AMPR instrument files will be provided in a netCDF-4 format. 
