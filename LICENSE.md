@@ -5,7 +5,7 @@ THIS OPEN SOURCE AGREEMENT (“AGREEMENT”) DEFINES THE RIGHTS OF USE, REPRODUC
 Government Agency: NASA Marshall Space Flight Center 
 Government Agency Original Software Designation: MFS-33219-1
 Government Agency Original Software Title: Python Advanced Microwave Precipitation Radiometer Data Toolkit (PyAMPR)
-User Registration Requested.  Please visit https://github.com/tjlang/pyampr 
+User Registration Requested.  Please visit https://github.com/nasa/PyAMPR 
 Government Agency Point of Contact for Original Software: _timothy.j.lang@nasa.gov
 
 
