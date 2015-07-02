@@ -1,3 +1,8 @@
+***************************
+IF YOU ARE USING PYAMPR FOR IPHEX DATA, GO BACK TO THE GHRC SERVER AND GET THE
+LATEST VERSION OF THE DATASET, AS WE HAVE FIXED THE 37 GHZ CHANNEL A AND B SWAP ISSUE.
+***************************
+
 Title/Version
 -------------
 Python AMPR Data Toolkit (PyAMPR) v1.4.2
@@ -71,3 +76,4 @@ A simple interactive testing notebook is available in the test directory.
 
 The following conference presentation describes PyAMPR (among other modules):
 https://ams.confex.com/ams/95Annual/webprogram/Paper262779.html
+
