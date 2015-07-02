@@ -1,7 +1,7 @@
 """
 google_earth_tools v1.2
 Collator and Editor - Timothy J. Lang of NASA MSFC (timothy.j.lang@nasa.gov)
-Library of tools for creating KMZ files. Amalgamated from several sources and 
+Library of tools for creating KMZ files. Amalgamated from several sources and
 edited. Requires simplekml from https://code.google.com/p/simplekml/.
 Also requires numpy, and matplotlib. Tested with Python 2.7.
 Last edited - 9/24/2014
@@ -9,62 +9,61 @@ Last edited - 9/24/2014
 Change Log
 ----------
 v1.2 major changes:
-1. Deleted kml_contour, kml_begin, kml_end, line begin, line_end, and place_label
-   functions as the write_ampr_kml method was removed from pyampr.AmprTb, given 
-   the superior write_ampr_kmz method.
+1. Deleted kml_contour, kml_begin, kml_end, line begin, line_end,
+   and place_label functions as the write_ampr_kml method was removed
+   from pyampr.AmprTb, given the superior write_ampr_kmz method.
 
 v1.1 major changes:
 1. Added timespan stamping capability via passing the times string list as
    an argument to make_kml().
 
 """
-
-SIMPLEKML_FLAG = True
 try:
     from simplekml import (Kml, OverlayXY, ScreenXY, Units, RotationXY,
                            AltitudeMode, Camera)
+    SIMPLEKML_FLAG = True
 except ImportError:
     SIMPLEKML_FLAG = False
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-############################################################
+
 def gearth_fig(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, pixels=1024):
     """
     Return a Matplotlib `fig` and `ax` handles for a Google-Earth Image.
-    TJL - Obtained from 
+    TJL - Obtained from
     http://ocefpaf.github.io/python4oceanographers/blog/2014/03/10/gearth/
-    
+
     """
     aspect = np.cos(np.mean([llcrnrlat, urcrnrlat]) * np.pi/180.0)
     xsize = np.ptp([urcrnrlon, llcrnrlon]) * aspect
     ysize = np.ptp([urcrnrlat, llcrnrlat])
     aspect = ysize / xsize
-    
+
     if aspect > 1.0:
         figsize = (10.0 / aspect, 10.0)
     else:
         figsize = (10.0, 10.0 * aspect)
-    
+
     if False:
-        plt.ioff()  # Make `True` to prevent the KML components from popping-up.
+        plt.ioff()  # Make `True` to prevent KML components from popping up
     fig = plt.figure(figsize=figsize, frameon=False, dpi=pixels//10)
-    # KML friendly image.  If using basemap try: `fix_aspect=False`.
+    # KML friendly image. If using basemap try: `fix_aspect=False`.
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(llcrnrlon, urcrnrlon)
     ax.set_ylim(llcrnrlat, urcrnrlat)
     return fig, ax
 
-############################################################
+
 def make_kml(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat,
              figs, colorbar=None, times=None, **kw):
     """
     TODO: LatLon bbox, list of figs, optional colorbar figure,
-    and several simplekml kw...
-    TJL - Obtained from 
+    and several simplekml kw ...
+    TJL - Obtained from
     http://ocefpaf.github.io/python4oceanographers/blog/2014/03/10/gearth/
-    
+
     """
     if not SIMPLEKML_FLAG:
         print '***ERROR!***'
@@ -80,11 +79,11 @@ def make_kml(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat,
                     longitude=np.mean([urcrnrlon, llcrnrlon]),
                     altitude=altitude, roll=roll, tilt=tilt,
                     altitudemode=altitudemode)
-                    
+
     kml.document.camera = camera
     draworder = 0
 
-    for fig in figs: #NOTE: Overlays are limited to the same bbox.
+    for fig in figs:  # NOTE: Overlays are limited to the same bbox.
         draworder += 1
         ground = kml.newgroundoverlay(name='GroundOverlay')
         ground.draworder = draworder
@@ -98,14 +97,14 @@ def make_kml(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat,
                                        'clampToSeaFloor')
         if times:
             ground.timespan.begin = times[0]
-            ground.timespan.end   = times[1]
+            ground.timespan.end = times[1]
         ground.icon.href = fig
-        #TJL - swapping west/east to match LL vs. UR properly
-        ground.latlonbox.west =  llcrnrlon
+        # TJL - swapping west/east to match LL vs. UR properly
+        ground.latlonbox.west = llcrnrlon
         ground.latlonbox.south = llcrnrlat
         ground.latlonbox.north = urcrnrlat
-        ground.latlonbox.east =  urcrnrlon
-                    
+        ground.latlonbox.east = urcrnrlon
+
     if colorbar:  # Options for colorbar are hard-coded (to avoid a big mess).
         screen = kml.newscreenoverlay(name='ScreenOverlay')
         screen.icon.href = colorbar
@@ -123,6 +122,6 @@ def make_kml(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat,
         screen.size.xunits = Units.fraction
         screen.size.yunits = Units.fraction
         screen.visibility = 1
-                    
+
     kmzfile = kw.pop('kmzfile', 'overlay.kmz')
     kml.savekmz(kmzfile)
