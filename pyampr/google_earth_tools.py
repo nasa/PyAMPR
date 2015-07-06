@@ -18,6 +18,8 @@ v1.1 major changes:
    an argument to make_kml().
 
 """
+from __future__ import absolute_import
+from __future__ import print_function
 try:
     from simplekml import (Kml, OverlayXY, ScreenXY, Units, RotationXY,
                            AltitudeMode, Camera)
@@ -66,9 +68,9 @@ def make_kml(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat,
 
     """
     if not SIMPLEKML_FLAG:
-        print '***ERROR!***'
-        print 'simplekml not installed, download from',\
-              'https://pypi.python.org/pypi/simplekml/'
+        print('***ERROR!***')
+        print('simplekml not installed, download from',
+              'https://pypi.python.org/pypi/simplekml/')
         return
     kml = Kml()
     altitude = kw.pop('altitude', 2e7)

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 # Setup script for the pyampr package
 # $Id: setup.py,v 1.0 2014/07/28 tjlang Exp $
 #
@@ -13,7 +14,7 @@ try:
 except:
     pass
 
-VERSION = '1.4.1'
+VERSION = '1.4.2'
 
 DESCRIPTION = "The Python Advanced Microwave Precipitation Radiometer " + \
     "Data Toolkit (PyAMPR) - a package to read, analyze, and display AMPR data"
@@ -37,16 +38,16 @@ setup(
     version=VERSION,
     author="Timothy J. Lang",
     author_email="timothy.j.lang@nasa.gov",
-    url="http://ghrc.nsstc.nasa.gov/",
+    url="http://github.com/nasa/PyAMPR/",
     description=DESCRIPTION,
     long_description=LONG_DESCRIPTION,
-    download_url="http://ghrc.nsstc.nasa.gov/",
+    download_url="http://github.com/nasa/PyAMPR/",
     license="LICENSE.md",
     packages=["pyampr"],
-    platforms="Python 2.7",
+    platforms="Python 2.7, 3.4",
     classifiers=["""
         Development Status :: Beta,
-        Programming Language :: Python",
+        Programming Language :: Python :: 2.7, 3.4
         Topic :: Scientific/Engineering
         Topic :: Scientific/Engineering :: Atmospheric Science
         Operating System :: Unix
