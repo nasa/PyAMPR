@@ -1,8 +1,10 @@
 Change Log
 ----------
-v1.4.2 major changes (07/02/2015):
+v1.4.2 major changes (07/06/2015):
 1. Updated netCDF read routines to account for IPHEx 37 GHz channel swap being fixed.
 2. Made all code pep8 compliant.
+3. Made PyAMPR and its notebooks work under Python 3.4. Python 2.7 still supported, but
+   users may have to install transition modules like six, etc.
 
 v1.4.1 major changes (06/26/2015):
 1. Updated netCDF read routines to be able to handle lab data with no geolocations.

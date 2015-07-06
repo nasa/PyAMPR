@@ -1,3 +1,7 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap, cm
@@ -6,11 +10,12 @@ import datetime
 import calendar
 import gzip
 import codecs
-from google_earth_tools import gearth_fig, make_kml
+from .google_earth_tools import gearth_fig, make_kml
 from netCDF4 import Dataset, num2date, date2num
+from six.moves import range
 
 try:
-    from udf_cmap import amprTB_cmap
+    from .udf_cmap import amprTB_cmap
     CMAP_FLAG = True
 except ImportError:
     CMAP_FLAG = False
@@ -42,7 +47,8 @@ If passed a filename, call the read_ampr_tb_level2b() method,
 otherwise just instance the class with nothing
         """
         if full_path_and_filename is None:
-            print 'Class instantiated, call read_ampr_tb_level2b() to populate'
+            print('Class instantiated,',
+                  'call read_ampr_tb_level2b() to populate')
         else:
             self.read_ampr_tb_level2b(full_path_and_filename, project=project)
 
@@ -118,12 +124,12 @@ Version 1.4.0: Added support for Level 2B netCDF files. Starting with IPHEX,
 processed AMPR instrument files will be provided in a netCDF-4 format.
         """
         _method_header_printout()
-        print 'read_ampr_tb_level2b(): Reading', full_path_and_filename
+        print('read_ampr_tb_level2b(): Reading', full_path_and_filename)
 
         try:
             self._read_level2b_netcdf(full_path_and_filename, project=project)
         except:
-            print 'Not netCDF file, trying ASCII read ...'
+            print('Not netCDF file, trying ASCII read ...')
             self._read_level2b_ascii(full_path_and_filename, project=project)
         _method_footer_printout()
 
@@ -182,7 +188,7 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
 
         plt.close()  # mpl seems buggy if you don't clean up old windows
         _method_header_printout()
-        print 'plot_ampr_track():'
+        print('plot_ampr_track():')
 
         # 10 GHz (A) channel plotted by default if mistake made
         if not isinstance(var, str):
@@ -195,11 +201,11 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
             return
 
         if self.Year[0] < 2011:
-            print 'Warning: Older projects commonly had bad or missing',\
-                  'geolocation data.'
-            print 'If there are plotting problems, try a strip chart with',\
-                  'plot_ampr_channels(),'
-            print 'or try adjusting scanrange, lonrange, or latrange.'
+            print('Warning: Older projects commonly had bad or missing',
+                  'geolocation data.')
+            print('If there are plotting problems, try a strip chart with',
+                  'plot_ampr_channels(),')
+            print('or try adjusting scanrange, lonrange, or latrange.')
 
         # Adjustable scan range limits
         # Fairly robust - will go down to a width of 10 scans or so before
@@ -266,9 +272,10 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
 
         # Plot title & display
         if title is None:
-            title = self._get_ampr_title(var) + self._get_date_string(ind1) +\
-                    ', ' + self.Time_String[ind1] + '-' +\
-                    self.Time_String[ind2-1] + ' UTC'
+            title = str(self._get_ampr_title(var)) + \
+                str(self._get_date_string(ind1)) + \
+                str(', ') + str(self.Time_String[ind1]) + str('-') + \
+                str(self.Time_String[ind2-1]) + str(' UTC')
         plt.title(title)
 
         # Add colorbar
@@ -315,7 +322,7 @@ timerange = Time range to plot. Overrides scanrange if both are set.
 
         plt.close()  # mpl seems buggy if you don't clean up old windows
         _method_header_printout()
-        print 'plot_ampr_channels():'
+        print('plot_ampr_channels():')
 
         tb_list = self._get_list_of_channels_to_plot(show_pol)
         if show_pol:
@@ -380,13 +387,19 @@ timerange = Time range to plot. Overrides scanrange if both are set.
                     locs, labels = plt.xticks()
                     new_labels = []
                     for t in locs:
-                        indt = np.where(self.Scan == t)
-                        new_labels.append(''.join(self.Time_String[indt[0]]))
+                        indt = np.where(self.Scan == int(t))
+                        tmpst = np.array(self.Time_String)[indt[0]]
+                        if not isinstance(tmpst, str):
+                            if len(tmpst) > 0:
+                                tmpst = tmpst[0]
+                            else:
+                                tmpst = ''
+                        new_labels.append(''.join(str(tmpst)))
                     axes[index].set_xticklabels(new_labels)
 
         # Check if missing too much data!
         if itest == 0:
-            print 'No data to plot, try reading in a file'
+            print('No data to plot, try reading in a file')
             _method_footer_printout()
             return
 
@@ -450,19 +463,19 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         """
         begin_time = time.time()
         _method_header_printout()
-        print 'calc_polarization():'
+        print('calc_polarization():')
 
         if self.Year[0] < 2011:
-            print 'Pre-2011, AMPR only had one channel per frequency.'
-            print 'Thus, PyAMPR cannot deconvolve polarization for'
-            print 'this project\'s data. Sorry!'
+            print('Pre-2011, AMPR only had one channel per frequency.')
+            print('Thus, PyAMPR cannot deconvolve polarization for')
+            print('this project\'s data. Sorry!')
             _method_footer_printout()
             return
 
         for chan in chan_list:
             if hasattr(self, 'TB'+chan+'A') and hasattr(self, 'TB'+chan+'B'):
 
-                print 'Calculating for', chan, 'GHz channel'
+                print('Calculating for', chan, 'GHz channel')
                 # Use dummy variables and setattr to get the right-sized arrays
                 T1 = 1.0 * getattr(self, 'TB'+chan+'A')
                 T2 = 1.0 * getattr(self, 'TB'+chan+'B')
@@ -495,15 +508,15 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                 setattr(self, 'TB'+chan+'H', tbh)
 
             else:
-                print 'TB' + chan, 'does not have both A and B channels,', \
-                      'read in a file to obtain.'
-                print 'Scene H & V not produced for this channel'
+                print('TB' + chan, 'does not have both A and B channels,',
+                      'read in a file to obtain.')
+                print('Scene H & V not produced for this channel')
 
-        print time.time() - begin_time, 'seconds to calculate H & V'
-        print 'If successful, following attributes are now available:'
+        print(time.time() - begin_time, 'seconds to calculate H & V')
+        print('If successful, following attributes are now available:')
         for chan in chan_list:
-            print 'TB'+chan+'H', 'TB'+chan+'V',
-        print
+            print('TB'+chan+'H', 'TB'+chan+'V', end='')
+        print()
         _method_footer_printout()
 
     #########################################
@@ -548,7 +561,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         """
         plt.close()  # mpl seems buggy if multiple windows are left open
         _method_header_printout()
-        print 'write_ampr_kmz():'
+        print('write_ampr_kmz():')
 
         # 10 GHz (A) channel plotted by default
         if var is None or isinstance(var, str) == False:
@@ -604,15 +617,15 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             fig.savefig('legend.png', transparent=True, format='png')
             make_kml(np.min(lonrange), np.min(latrange), np.max(lonrange),
                      np.max(latrange), figs=['overlay.png'],
-                     kmzfile=file_path+file_name, colorbar='legend.png',
+                     kmzfile=str(file_path+file_name), colorbar='legend.png',
                      times=times)
         else:
             make_kml(np.min(lonrange), np.min(latrange), np.max(lonrange),
                      np.max(latrange), figs=['overlay.png'],
-                     kmzfile=file_path+file_name, times=times)
+                     kmzfile=str(file_path+file_name), times=times)
 
-        print 'Google Earth image hopefully written to:', \
-            file_path + file_name
+        print('Google Earth image hopefully written to:',
+              file_path + file_name)
         _method_footer_printout()
 
     #################################################################
@@ -632,7 +645,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self._assign_project_name(project)
 
         # Check for navigation
-        if 'lat' in level2b.variables.keys():
+        if 'lat' in list(level2b.variables.keys()):
             print('Found Navigation Data!')
             self.hasNav = True
         else:
@@ -694,7 +707,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self.Minute = np.zeros(self.nscans, dtype=np.int32)
         self.Second = np.zeros(self.nscans, dtype=np.int32)
         self.Second_of_Day = np.zeros(self.nscans, dtype=np.int32)
-        self.Time_String = np.zeros(self.nscans, dtype='a8')
+        # self.Time_String = np.zeros(self.nscans, dtype='a8')
+        self.Time_String = []
 
     #########################################
 
@@ -739,7 +753,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             self.Aircraft_Nav[var][:] = self.bad_data
         if self.hasNav:
             # Now, return a structured array of Aircraft_Nav parameters.
-            print np.shape(level2b.variables['gLat'])
+            print(np.shape(level2b.variables['gLat']))
             self.Aircraft_Nav['GPS Latitude'] = level2b.variables['gLat'][:]
             self.Aircraft_Nav['GPS Longitude'] = level2b.variables['gLon'][:]
             self.Aircraft_Nav['GPS Altitude'] = level2b.variables['gAlt'][:]
@@ -803,9 +817,10 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             self.Minute[icount] = np.int32(self.dateTimes[icount].minute)
             self.Second[icount] = np.int32(self.dateTimes[icount].second)
             # Create a Time String and get Second of Data
-            self.Time_String[icount], self.Second_of_Day[icount] = \
+            ts, self.Second_of_Day[icount] = \
                 _get_timestring_and_sod(self.Hour[icount], self.Minute[icount],
                                         self.Second[icount])
+            self.Time_String.append(ts)
 
     #########################################
 
@@ -822,7 +837,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
         # Determine number of scans
         self.nscans = np.size(self.ampr_string)
-        print 'Number of scans =', self.nscans
+        print('Number of scans =', self.nscans)
 
         # Hard-coding sizes of AMPR arrays and dictionaries
         self._hard_code_ampr_array_sizes_and_other_metadata()
@@ -843,13 +858,14 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                 self._fill_pre2011_header_and_aircraft_info(line_split,
                                                             index)
 
-            self.Time_String[index], self.Second_of_Day[index] = \
+            ts, self.Second_of_Day[index] = \
                 _get_timestring_and_sod(
                     self.Hour[index], self.Minute[index],
                     self.Second[index])
+            self.Time_String.append(ts)
 
             # Get TBs, Latitudes, Longitudes, etc.
-            for i in xrange(self.swath_size):
+            for i in range(self.swath_size):
 
                 if self.Project == 'IPHEX':
                     self._fill_2011on_ampr_variables(line_split, index, i)
@@ -885,7 +901,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         # Replace unfilled data.
         self._set_unfilled_data_to_bad()
         if self.Year[0] < 2011:
-            print 'Only A channels available in this project\'s data'
+            print('Only A channels available in this project\'s data')
 
     #########################################
 
@@ -904,9 +920,9 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         condition = np.logical_or(cond1, cond2)
         indices = np.where(condition)
         if np.shape(indices)[1] > 0:
-            print np.shape(indices)[1],\
-                'bad geolocation(s) (e.g., ' + str(self.bad_data) + \
-                's) exist, attempting correction.'
+            print(np.shape(indices)[1],
+                  'bad geolocation(s) (e.g., ' + str(self.bad_data) +
+                  's) exist, attempting correction.')
             zdata = np.delete(zdata, indices[0], axis=0)
             plon = np.delete(plon, indices[0], axis=0)
             plat = np.delete(plat, indices[0], axis=0)
@@ -918,11 +934,11 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             condition = np.logical_or(cond1, cond2)
             indices = np.where(condition)
             if np.shape(indices)[1] > 0:
-                print np.shape(indices)[1], \
-                      'bad geolocation(s) (0s/-1s) exist,', \
-                      'attempting correction.'
-                print 'If aircraft crossed Equator or Prime Meridian,', \
-                      'try keyword equator=True.'
+                print(np.shape(indices)[1],
+                      'bad geolocation(s) (0s/-1s) exist,',
+                      'attempting correction.')
+                print('If aircraft crossed Equator or Prime Meridian,',
+                      'try keyword equator=True.')
                 zdata = np.delete(zdata, indices[0], axis=0)
                 plon = np.delete(plon, indices[0], axis=0)
                 plat = np.delete(plat, indices[0], axis=0)
@@ -938,9 +954,9 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         condition = np.logical_or(cond1, cond2)
         indices = np.where(condition)
         if np.shape(indices)[1] > 0:
-            print np.shape(indices)[1],\
-                  'scan(s) with high intra-scan geolocation variance exist,',\
-                  'attempting correction.'
+            print(np.shape(indices)[1],
+                  'scan(s) with high intra-scan geolocation variance exist,',
+                  'attempting correction.')
             zdata = np.delete(zdata, indices[0], axis=0)
             plon = np.delete(plon, indices[0], axis=0)
             plat = np.delete(plat, indices[0], axis=0)
@@ -961,22 +977,22 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         dates and call for each date separately.
 
         """
-        print 'Available scans =', np.min(self.Scan), 'to', np.max(self.Scan)
-        print 'Available times =', self.Time_String[0], '-', \
-            self.Time_String[self.nscans-1]
+        print('Available scans =', np.min(self.Scan), 'to', np.max(self.Scan))
+        print('Available times =', str(self.Time_String[0]), str('-'),
+              str(self.Time_String[self.nscans-1]))
         if not scanrange and not timerange:
             ind1, ind2 = self._get_min_max_indices()
 
         elif scanrange is not None and timerange is None:
             indices = np.where(self.Scan == np.min(scanrange))
             if np.shape(indices[0])[0] == 0:
-                print 'Scan number too small, using first scan for beginning'
+                print('Scan number too small, using first scan for beginning')
                 ind1 = 0
             else:
                 ind1 = indices[0][0]
             indices = np.where(self.Scan == np.max(scanrange))
             if np.shape(indices[0])[0] == 0:
-                print 'Scan number too high, using last scan for end'
+                print('Scan number too high, using last scan for end')
                 ind2 = self.nscans
             else:
                 ind2 = indices[0][0]
@@ -1020,7 +1036,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self.Second = np.zeros(self.nscans, dtype=np.int32)
         self.Icon = np.zeros(self.nscans, dtype=np.int32)
         self.Second_of_Day = np.zeros(self.nscans, dtype=np.int32)
-        self.Time_String = np.zeros(self.nscans, dtype='a8')
+        # self.Time_String = np.zeros(self.nscans, dtype='a8')
+        self.Time_String = []
         self.Noise10 = np.zeros(self.nscans, dtype='float')
         self.Noise19 = np.zeros(self.nscans, dtype='float')
         self.Noise37 = np.zeros(self.nscans, dtype='float')
@@ -1056,25 +1073,24 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     def _initialize_aircraft_dict(self):
         """Aircraft Navgation info"""
-        self.Aircraft_varlist = ['GPS Latitude', 'GPS Longitude',
-                                 'GPS Altitude', 'Pitch', 'Roll',
-                                 'Yaw', 'Heading', 'Ground Speed',
-                                 'Air Speed', 'Static Pressure',
-                                 'Total Pressure', 'Total Temperature',
-                                 'Static Temperature', 'Wind Speed',
-                                 'Wind Direction', 'INS Latitude',
-                                 'INS Longitude', 'INS Altitude']
-        dt = []
-        for i in xrange(self.nav_size):
-            dt.append((self.Aircraft_varlist[i], 'float'))
-        self.Aircraft_Nav = np.zeros(self.nscans, dtype=dt)
+        self.Aircraft_varlist = [u'GPS Latitude', u'GPS Longitude',
+                                 u'GPS Altitude', u'Pitch', u'Roll',
+                                 u'Yaw', u'Heading', u'Ground Speed',
+                                 u'Air Speed', u'Static Pressure',
+                                 u'Total Pressure', u'Total Temperature',
+                                 u'Static Temperature', u'Wind Speed',
+                                 u'Wind Direction', u'INS Latitude',
+                                 u'INS Longitude', u'INS Altitude']
+        self.Aircraft_Nav = {}
+        for var in self.Aircraft_varlist:
+            self.Aircraft_Nav[var] = np.zeros(self.nscans, dtype=float)
 
     #########################################
 
     def _fill_epoch_time(self):
         """Calculate Epoch_Time attribute"""
         self.Epoch_Time = 0 * self.Second
-        for i in xrange(self.nscans):
+        for i in range(self.nscans):
             self.Epoch_Time[i] = calendar.timegm(
                 (int(self.Year[i]), int(self.Month[i]), int(self.Day[i]),
                  int(self.Hour[i]), int(self.Minute[i]), int(self.Second[i])))
@@ -1147,9 +1163,9 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     def _get_gearth_file_name(self, var=None, index=0, suffix=None):
         """Obtains default file name for Google Earth KMZ"""
         mo, dy = self._get_month_and_day_string(index)
-        timestamp = self.Time_String[index].replace(':', '')
-        return str(self.Year[index]) + mo + dy + '_' + \
-            timestamp + 'z_TB' + var.upper() + suffix
+        timestamp = str(self.Time_String[index]).replace(':', '')
+        return str(self.Year[index]) + str(mo) + str(dy) + str('_') + \
+            str(timestamp) + str('z_TB') + str(var.upper()) + str(suffix)
 
     #########################################
 
@@ -1163,7 +1179,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         plat = 1.0 * getattr(self, 'Latitude')
         plat = plat[ind1:ind2]
         if not maneuver:
-            print 'Filtering out significant aircraft maneuvers'
+            print('Filtering out significant aircraft maneuvers')
             roll = self.Aircraft_Nav['Roll'][ind1:ind2]
             indices = np.where(np.abs(roll) >= 5)
             if np.shape(indices)[1] > 0:
@@ -1176,15 +1192,15 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     def _fill_2011on_header_info(self, line_split=None, index=None):
         """For ASCII data, fill 2011+ metadata variables"""
-        self.Scan[index] = long(line_split[0])
-        self.Year[index] = long(line_split[1])
-        self.Month[index] = long(line_split[2])
-        self.Day[index] = long(line_split[3])
-        self.Day_of_Year[index] = long(line_split[4])
-        self.Hour[index] = long(line_split[5])
-        self.Minute[index] = long(line_split[6])
-        self.Second[index] = long(line_split[7])
-        self.Icon[index] = long(line_split[8])
+        self.Scan[index] = int(line_split[0])
+        self.Year[index] = int(line_split[1])
+        self.Month[index] = int(line_split[2])
+        self.Day[index] = int(line_split[3])
+        self.Day_of_Year[index] = int(line_split[4])
+        self.Hour[index] = int(line_split[5])
+        self.Minute[index] = int(line_split[6])
+        self.Second[index] = int(line_split[7])
+        self.Icon[index] = int(line_split[8])
 
     #########################################
 
@@ -1198,16 +1214,16 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self.Scan[index] = index + 1
         if (self.Project == 'JAX90' or self.Project == 'CAPE' or
                 self.Project == 'COARE') and index == 0:
-            self.Year[:] = long(line_split[1])
+            self.Year[:] = int(line_split[1])
         if (self.Project != 'JAX90' and self.Project != 'CAPE' and
                 self.Project != 'COARE' and index == 0):
-            self.Year[:] = long(line_split[0])
-        self.Day_of_Year[index] = long(line_split[1])
+            self.Year[:] = int(line_split[0])
+        self.Day_of_Year[index] = int(line_split[1])
         doy = int(line_split[1]) - 1
         sdate = str(datetime.date(self.Year[index], 1, 1) +
                     datetime.timedelta(doy))
-        self.Month[index] = long(sdate[5:7])
-        self.Day[index] = long(sdate[8:10])
+        self.Month[index] = int(sdate[5:7])
+        self.Day[index] = int(sdate[8:10])
         if (self.Project == 'JAX90' or self.Project == 'CAPE' or
                 self.Project == 'COARE') and index == 1:
             # Assuming date change doesn't occur between lines 1 and 2
@@ -1216,10 +1232,10 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             self.Day[0] = self.Day[1]
         # End theatrics - WHEW!
 
-        self.Hour[index] = long(line_split[2])
-        self.Minute[index] = long(line_split[3])
-        self.Second[index] = long(line_split[4])
-        self.Icon[index] = long(line_split[5])
+        self.Hour[index] = int(line_split[2])
+        self.Minute[index] = int(line_split[3])
+        self.Second[index] = int(line_split[4])
+        self.Icon[index] = int(line_split[5])
         self.Aircraft_Nav['GPS Latitude'][index] = float(line_split[6])
         self.Aircraft_Nav['GPS Longitude'][index] = float(line_split[7])
         self.Aircraft_Nav['GPS Altitude'][index] = float(line_split[8])
@@ -1293,9 +1309,9 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         condition = np.logical_and(cond1, cond2)
         indices = np.where(condition)
         if np.shape(indices)[1] < 100:
-            print np.shape(indices)[1], 'good gelocations,', \
-                'need 100+ (i.e., 2+ scans).'
-            print 'Not enough good geolocation data to plot, returning.'
+            print(np.shape(indices)[1], 'good gelocations,',
+                  'need 100+ (i.e., 2+ scans).')
+            print('Not enough good geolocation data to plot, returning.')
             return False
         else:
             return True
@@ -1310,9 +1326,9 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         aspect_ratio = (float(np.max(latrange)) - float(np.min(latrange))) /\
                        (float(np.max(lonrange)) - float(np.min(lonrange)))
         if aspect_ratio < 0.5 or aspect_ratio > 2:
-            print 'Warning: Your aspect ratio choice could lead to poor', \
-                'plotting results.'
-            print 'Best results are obtained when latrange ~ lonrange.'
+            print('Warning: Your aspect ratio choice could lead to poor',
+                  'plotting results.')
+            print('Best results are obtained when latrange ~ lonrange.')
 
     #########################################
 
@@ -1330,7 +1346,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     def _fill_2011on_aircraft_info(self, line_split, index):
         """For ASCII data, fill 2011+ aircraft navigation variables"""
-        aircraft_i = 0L
+        aircraft_i = 0
         for name in self.Aircraft_varlist:
             self.Aircraft_Nav[name][index] = \
                     float(line_split[aircraft_i + 9 + 10 * self.swath_size])
@@ -1344,8 +1360,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             tb_list = ['10V', '10H', '19V', '19H', '37V', '37H', '85V', '85H']
             if (not hasattr(self, 'TB10V') or not hasattr(self, 'TB19V') or not
                     hasattr(self, 'TB37V') or not hasattr(self, 'TB85V')):
-                print 'Missing some pol channels,', \
-                    'trying calc_polarization() before plot'
+                print('Missing some pol channels,',
+                      'trying calc_polarization() before plot')
                 self.calc_polarization()
         else:
             tb_list = ['10A', '10B', '19A', '19B', '37A', '37B', '85A', '85B']
@@ -1355,9 +1371,9 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     def _missing_channel_printout(self):
         """Simple warning message if requested channel is missing"""
-        print 'Channel doesn\'t exist, check typing or try reading in a file'
-        print 'Acceptable channels = 10A, 10B, 19A, 19B, 37A, 37B, 85A, 85B'
-        print 'If calculated, also = 10H, 10V, 19H, 19V, 37H, 37V, 85H, 85V'
+        print('Channel doesn\'t exist, check typing or try reading in a file')
+        print('Acceptable channels = 10A, 10B, 19A, 19B, 37A, 37B, 85A, 85B')
+        print('If calculated, also = 10H, 10V, 19H, 19V, 37H, 37V, 85H, 85V')
 
     #########################################
 
@@ -1408,21 +1424,18 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                 ascii = codecs.getreader('ASCII')
                 fileobj = ascii(fileobj)
             except:
-                print 'Incorrect file or file doesn\'t exist, returning'
-                _method_footer_printout()
+                print('Incorrect file or file doesn\'t exist, returning')
                 return False
         else:
             try:
                 fileobj = open(full_path_and_filename, 'r')
             except:
-                print 'Incorrect file or file doesn\'t exist, returning'
-                _method_footer_printout()
+                print('Incorrect file or file doesn\'t exist, returning')
                 return False
         try:
             contents = fileobj.readlines()
         except:
-            print 'File not ASCII format, returning'
-            _method_footer_printout()
+            print('File not ASCII format, returning')
             fileobj.close()
             return False
         fileobj.close()
@@ -1434,18 +1447,18 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     def _assign_project_name(self, project=DEFAULT_PROJECT_NAME):
         """Check user-provided project name and keep track of it"""
         if not isinstance(project, str):
-            print 'Bad project name, provide actual string'
-            print 'Assuming', DEFAULT_PROJECT_NAME, 'data structure.'
+            print('Bad project name, provide actual string')
+            print('Assuming', DEFAULT_PROJECT_NAME, 'data structure.')
             project = DEFAULT_PROJECT_NAME
         else:
-            print 'Assuming', project.upper(), 'data structure.'
-        print 'Change to proper project if incorrect, otherwise errors', \
-              'will occur.'
-        print 'Currently available field projects: IPHEX, MC3E, TC4, TCSP,', \
-              'JAX90, COARE,'
-        print 'CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA,', \
-              'FIRE3ACE, CAPE'
-        print 'Default: project = \''+DEFAULT_PROJECT_NAME+'\''
+            print('Assuming', project.upper(), 'data structure.')
+        print('Change to proper project if incorrect, otherwise errors',
+              'will occur.')
+        print('Currently available field projects: IPHEX, MC3E, TC4, TCSP,',
+              'JAX90, COARE,')
+        print('CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA,',
+              'FIRE3ACE, CAPE')
+        print('Default: project = \''+DEFAULT_PROJECT_NAME+'\'')
         self.Project = project.upper()
 
     #########################################
@@ -1529,11 +1542,11 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     def _get_timestamps_for_gearth(self, ind1=None, ind2=None):
         """Format example: '1997-07-16T07:30:15Z'"""
         mo, dy = self._get_month_and_day_string(ind1)
-        time1 = str(self.Year[ind1]) + '-' + mo + '-' + dy + 'T' +\
-            self.Time_String[ind1] + 'Z'
+        time1 = str(self.Year[ind1]) + str('-') + str(mo) + str('-') + \
+            str(dy) + str('T') + str(self.Time_String[ind1]) + str('Z')
         mo, dy = self._get_month_and_day_string(ind2-1)
-        time2 = str(self.Year[ind2-1]) + '-' + mo + '-' + dy + 'T' + \
-            self.Time_String[ind2-1] + 'Z'
+        time2 = str(self.Year[ind2-1]) + str('-') + str(mo) + str('-') + \
+            str(dy) + str('T') + str(self.Time_String[ind2-1]) + str('Z')
         times = [time1, time2]
         return times
 
@@ -1550,7 +1563,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         sdy = str(self.Day[index])
         if self.Day[index] < 10:
             sdy = '0' + sdy
-        return smo, sdy
+        return str(smo), str(sdy)
 
     #########################################
 
@@ -1572,14 +1585,14 @@ def _get_timestring_and_sod(hour=None, minute=None, second=None):
     """Time_String: Fill size gaps with 0s"""
     d = str(hour)
     if hour < 10:
-        d = '0' + d
+        d = str('0' + d)
     e = str(minute)
     if minute < 10:
-        e = '0' + e
+        e = str('0' + e)
     f = str(second)
     if second < 10:
-        f = '0' + f
-    return d + ':' + e + ':' + f, _get_sod(hour, minute, second)
+        f = str('0' + f)
+    return str(d + str(':') + e + str(':') + f), _get_sod(hour, minute, second)
 
 
 def _get_sod(hour=None, minute=None, second=None):
@@ -1589,17 +1602,17 @@ def _get_sod(hour=None, minute=None, second=None):
 
 def _method_footer_printout():
     """Helps clarify text output"""
-    print '********************'
-    print
+    print('********************')
+    print()
 
 
 def _method_header_printout():
     """Helps clarify text output"""
-    print
-    print '********************'
+    print()
+    print('********************')
 
 
 def _print_times_not_valid():
     """Warning message if user provided bad timerange keyword"""
-    print 'Times not valid, just plotting everything'
-    print 'Next time try timerange=[\'hh:mm:ss\',\'HH:MM:SS\']'
+    print('Times not valid, just plotting everything')
+    print('Next time try timerange=[\'hh:mm:ss\',\'HH:MM:SS\']')

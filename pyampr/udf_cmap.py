@@ -16,6 +16,7 @@ Rev 1.0, 05.04.2014
 
 
 """
+from __future__ import absolute_import
 
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
