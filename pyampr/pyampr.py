@@ -15,12 +15,12 @@ from netCDF4 import Dataset, num2date, date2num
 from six.moves import range
 
 try:
-    from .udf_cmap import amprTB_cmap
+    from .udf_cmap import amprTB_cmap, amprQC_cmap
     CMAP_FLAG = True
 except ImportError:
     CMAP_FLAG = False
 
-VERSION = '1.4.2'
+VERSION = '1.5'
 
 # Fixed constants used by PyAMPR set here
 DEFAULT_CLEVS = [75, 325]
@@ -146,7 +146,8 @@ processed AMPR instrument files will be provided in a netCDF-4 format.
                         title=None, clevs=DEFAULT_CLEVS, cmap=None,
                         save=None, show_track=False, maneuver=True,
                         scanrange=None, show_grid=True, equator=False,
-                        timerange=None, return_flag=False):
+                        timerange=None, return_flag=False, show_qc=False,
+                        resolution='l'):
 
         """
 This method plots geolocated AMPR data, along with the Aircraft track if
@@ -184,6 +185,8 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
               returned is fig (figure instance), ax (main axis instance),
               m (Basemap instance), cax (colorbar axis instance),
               cbar (colorbar instance).
+show_qc = Set to True to show QC flags instead of TB variables.
+resolution = Resolution of Basemap ('c', 'l', 'i', 'h')
         """
 
         plt.close()  # mpl seems buggy if you don't clean up old windows
@@ -200,6 +203,9 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
             _method_footer_printout()
             return
 
+        # Check that QC data exist
+        show_qc, clevs = self._check_qc(show_qc, clevs)
+
         if self.Year[0] < 2011:
             print('Warning: Older projects commonly had bad or missing',
                   'geolocation data.')
@@ -212,7 +218,7 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
         # plotting artifacts begin to occur.
         ind1, ind2 = self._get_scan_indices(scanrange, timerange)
         plon, plat, zdata = self._get_data_subsection(var, ind1, ind2,
-                                                      maneuver)
+                                                      maneuver, show_qc)
         plon, plat, zdata = self._filter_bad_geolocations(plon, plat,
                                                           zdata, equator)
         enough_data = self._check_for_enough_data_to_plot(plon, plat)
@@ -235,7 +241,7 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
         m = Basemap(projection='merc', lon_0=lon_0, lat_0=lat_0,
                     llcrnrlat=llcrnrlat, urcrnrlat=urcrnrlat,
                     llcrnrlon=llcrnrlon, urcrnrlon=urcrnrlon,
-                    resolution='l')
+                    resolution=resolution)
         m.drawcoastlines()
         m.drawstates()
         m.drawcountries()
@@ -256,7 +262,7 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
         x, y = m(plon, plat)
 
         # Draw filled contours
-        cmap = self._get_colormap(cmap, CMAP_FLAG)
+        cmap = self._get_colormap(cmap, CMAP_FLAG, show_qc)
         cs = m.pcolormesh(x, y, zdata, vmin=np.min(clevs),
                           vmax=np.max(clevs), cmap=cmap)
 
@@ -283,7 +289,7 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
         cax = fig.add_axes([0.20, 0.07, 0.60, 0.02])
         cbar = plt.colorbar(cs, cax=cax, orientation='horizontal',
                             extend='both')
-        cbar.set_label('Brightness Temperature (K)')
+        cbar = self._adjust_colorbar(cbar, show_qc)
 
         # Save file
         if save is not None:
@@ -297,7 +303,7 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
     #########################################
 
     def plot_ampr_channels(self, scanrange=None, cmap=None,
-                           clevs=DEFAULT_CLEVS,
+                           clevs=DEFAULT_CLEVS, show_qc=False,
                            save=None, show_pol=False, timerange=None):
 
         """
@@ -315,6 +321,8 @@ scanrange = List of scan numbers (from AmprTb.Scan) to plot.
             Only max/min are used.
 show_pol = Set to True to show deconvolved H & V polarizations. Will call
            calc_polarization() beforehand if these channels are missing.
+show_qc = Set to True to show QC flags instead of TB variables.
+          Overrides show_pol.
 timerange = Time range to plot. Overrides scanrange if both are set.
             Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
 
@@ -324,8 +332,11 @@ timerange = Time range to plot. Overrides scanrange if both are set.
         _method_header_printout()
         print('plot_ampr_channels():')
 
-        tb_list = self._get_list_of_channels_to_plot(show_pol)
-        if show_pol:
+        # Check that QC data exist
+        show_qc, clevs = self._check_qc(show_qc, clevs)
+
+        tb_list = self._get_list_of_channels_to_plot(show_pol, show_qc)
+        if show_pol is True and show_qc is False:
             pol_flag = self._check_for_pol_data()
             if not pol_flag:
                 _method_footer_printout()
@@ -348,14 +359,17 @@ timerange = Time range to plot. Overrides scanrange if both are set.
         plt.text(0.5, 1.60, ptitle, horizontalalignment='center', fontsize=14,
                  transform=axes[0].transAxes)
 
-        colormap = self._get_colormap(cmap, CMAP_FLAG)
+        colormap = self._get_colormap(cmap, CMAP_FLAG, show_qc)
 
         # Loop and plot available channels
         itest = 0
         for index, chan in enumerate(tb_list):
             if hasattr(self, 'TB'+chan):
                 itest = itest + 1
-                var = np.transpose(getattr(self, 'TB'+chan))
+                if show_qc:
+                    var = np.transpose(getattr(self, 'qctb'+chan.lower()))
+                else:
+                    var = np.transpose(getattr(self, 'TB'+chan))
                 # AMPR data arranged L-to-R in PyAMPR (index 0 to index 49
                 # in a scan),
                 # so need to reverse order to have L on top in strip charts.
@@ -371,7 +385,7 @@ timerange = Time range to plot. Overrides scanrange if both are set.
                 axes[index].tick_params(axis='y', which='both', left='off',
                                         right='off')
                 # Shows how V and H vary with beam position
-                if show_pol is False:
+                if show_pol is False or show_qc is True:
                     if index % 2 == 0:
                         axes[index].set_yticklabels(['H', 'V'])
                     else:
@@ -408,8 +422,8 @@ timerange = Time range to plot. Overrides scanrange if both are set.
         cax = fig.add_axes([0.126, 0.245, 0.775, 0.01])
         cbar = plt.colorbar(im, cax=cax, orientation='horizontal',
                             extend='both')
+        cbar = self._adjust_colorbar(cbar, show_qc)
         cbar.ax.tick_params(labelsize=7)
-        cbar.set_label('Brightness Temperature (K)', size=7)
 
         # Add Aircraft roll angle time series
         if hasattr(self, 'Aircraft_Nav'):
@@ -515,8 +529,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         print(time.time() - begin_time, 'seconds to calculate H & V')
         print('If successful, following attributes are now available:')
         for chan in chan_list:
-            print('TB'+chan+'H', 'TB'+chan+'V', end='')
-        print()
+            print('TB'+chan+'H', 'TB'+chan+'V', end=' ')
+        print('')
         _method_footer_printout()
 
     #########################################
@@ -524,8 +538,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     def write_ampr_kmz(self, var=DEFAULT_VAR, latrange=None, lonrange=None,
                        clevs=DEFAULT_CLEVS, cmap=None, timerange=None,
                        file_path=None, file_name=None, scanrange=None,
-                       show_legend=True, equator=False, maneuver=True):
-
+                       show_legend=True, equator=False, maneuver=True,
+                       show_qc=False):
         """
         This method plots geolocated AMPR data as a filled color Google Earth
         kmz. Qualitatively similar plot to plot_ampr_track() but for Google
@@ -558,6 +572,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                    significant aircraft maneuvers.
         timerange = Time range to plot. Overrides scanrange if both are set.
                     Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
+        show_qc = Set to True to show QC flags instead of TB variables.
         """
         plt.close()  # mpl seems buggy if multiple windows are left open
         _method_header_printout()
@@ -573,12 +588,15 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             _method_footer_printout()
             return
 
+        # Check that QC data exist
+        show_qc, clevs = self._check_qc(show_qc, clevs)
+
         # Adjustable scan range limits
         # Fairly robust - will go down to a width of 25 scans before plotting
         # artifacts begin to occur.
         ind1, ind2 = self._get_scan_indices(scanrange, timerange)
         plon, plat, zdata = self._get_data_subsection(
-            var, ind1, ind2, maneuver)
+            var, ind1, ind2, maneuver, show_qc)
         plon, plat, zdata = self._filter_bad_geolocations(plon, plat,
                                                           zdata, equator)
         enough_data = self._check_for_enough_data_to_plot(plon, plat)
@@ -598,7 +616,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         # Google Earth image production
         fig, ax = gearth_fig(np.min(lonrange), np.min(latrange),
                              np.max(lonrange), np.max(latrange))
-        cmap = self._get_colormap(cmap, CMAP_FLAG)
+        cmap = self._get_colormap(cmap, CMAP_FLAG, show_qc)
         cs = ax.pcolormesh(plon, plat, zdata,
                            vmin=np.min(clevs), vmax=np.max(clevs), cmap=cmap)
         ax.set_axis_off()
@@ -612,7 +630,12 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             cbytick_obj = plt.getp(cb.ax.axes, 'yticklabels')
             plt.setp(cbytick_obj, color='w', weight='bold')
             ptitle = self._get_ampr_title(var)
-            cb.set_label(ptitle+'TB [K]', rotation=-90, color='w',
+            if show_qc:
+                cb.set_ticks([1, 2, 3, 4, 5])
+                clabel = 'QC Flag'
+            else:
+                clabel = 'TB [K]'
+            cb.set_label(ptitle+clabel, rotation=-90, color='w',
                          labelpad=20, weight='bold')
             fig.savefig('legend.png', transparent=True, format='png')
             make_kml(np.min(lonrange), np.min(latrange), np.max(lonrange),
@@ -697,18 +720,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self.swath_angle = level2b.variables['scan_angle'][:]
         self.swath_left = self.swath_angle[0]
         self.swath_size = self.ncross
-
-        # Before looping through the datetime object, initialize numpy arrays
-        self.Year = np.zeros(self.nscans, dtype=np.int32)
-        self.Month = np.zeros(self.nscans, dtype=np.int32)
-        self.Day = np.zeros(self.nscans, dtype=np.int32)
-        self.Day_of_Year = np.zeros(self.nscans, dtype=np.int32)
-        self.Hour = np.zeros(self.nscans, dtype=np.int32)
-        self.Minute = np.zeros(self.nscans, dtype=np.int32)
-        self.Second = np.zeros(self.nscans, dtype=np.int32)
-        self.Second_of_Day = np.zeros(self.nscans, dtype=np.int32)
-        # self.Time_String = np.zeros(self.nscans, dtype='a8')
-        self.Time_String = []
+        self._initialize_time_fields()
 
     #########################################
 
@@ -816,11 +828,16 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             self.Hour[icount] = np.int32(self.dateTimes[icount].hour)
             self.Minute[icount] = np.int32(self.dateTimes[icount].minute)
             self.Second[icount] = np.int32(self.dateTimes[icount].second)
-            # Create a Time String and get Second of Data
-            ts, self.Second_of_Day[icount] = \
-                _get_timestring_and_sod(self.Hour[icount], self.Minute[icount],
-                                        self.Second[icount])
-            self.Time_String.append(ts)
+            self._set_timestring_and_sod(icount)
+
+    #########################################
+
+    def _set_timestring_and_sod(self, index):
+        """Create a Time String and get Second of Day for each scan"""
+        ts, self.Second_of_Day[index] = \
+            _get_timestring_and_sod(self.Hour[index], self.Minute[index],
+                                    self.Second[index])
+        self.Time_String.append(ts)
 
     #########################################
 
@@ -857,12 +874,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                 # info before TBs
                 self._fill_pre2011_header_and_aircraft_info(line_split,
                                                             index)
-
-            ts, self.Second_of_Day[index] = \
-                _get_timestring_and_sod(
-                    self.Hour[index], self.Minute[index],
-                    self.Second[index])
-            self.Time_String.append(ts)
+            self._set_timestring_and_sod(index)
 
             # Get TBs, Latitudes, Longitudes, etc.
             for i in range(self.swath_size):
@@ -877,7 +889,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                     self.TB37A[index, i] = float(line_split[i + 9 +
                                                  5 * self.swath_size])
                     # Note: Currently (May 2014) Land_Fraction## is set to
-                    # bad data in IPHEX files
+                    # bad data in IPHEX ASCII files
                     # Terrain elevation data not recorded, instead incidence
                     # angle is in its position
                     self.Elevation[index, i] = self.bad_data
@@ -1023,10 +1035,33 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     #########################################
 
-    def _declare_ampr_variables(self):
-        """Define variables to be populated"""
-        # Timing, Icon, and Noise
-        self.Scan = np.zeros(self.nscans, dtype=np.int32)
+    def _adjust_colorbar(self, cbar, show_qc):
+        if show_qc:
+            cbar.set_ticks([1, 2, 3, 4, 5])
+            cbar.set_label('QC Flag')
+        else:
+            cbar.set_label('Brightness Temperature (K)')
+        return cbar
+
+    #########################################
+
+    def _check_qc(self, show_qc, clevs):
+        """Used by strip charts, track plots, and Google Earth maps"""
+        if show_qc:
+            if not hasattr(self, 'qctb10a'):
+                print('No QC flags available, plotting TB data instead')
+                show_qc = False
+            else:
+                clevs = [0, 6]
+        return show_qc, clevs
+
+    #########################################
+
+    def _initialize_time_fields(self):
+        """
+        Common to ASCII and netCDF reads.
+        Before looping through the datetime object, initialize numpy arrays.
+        """
         self.Year = np.zeros(self.nscans, dtype=np.int32)
         self.Month = np.zeros(self.nscans, dtype=np.int32)
         self.Day = np.zeros(self.nscans, dtype=np.int32)
@@ -1034,10 +1069,17 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self.Hour = np.zeros(self.nscans, dtype=np.int32)
         self.Minute = np.zeros(self.nscans, dtype=np.int32)
         self.Second = np.zeros(self.nscans, dtype=np.int32)
-        self.Icon = np.zeros(self.nscans, dtype=np.int32)
         self.Second_of_Day = np.zeros(self.nscans, dtype=np.int32)
-        # self.Time_String = np.zeros(self.nscans, dtype='a8')
         self.Time_String = []
+
+    #########################################
+
+    def _declare_ampr_variables(self):
+        """Define variables to be populated"""
+        # Timing, Icon, and Noise
+        self._initialize_time_fields()
+        self.Scan = np.zeros(self.nscans, dtype=np.int32)
+        self.Icon = np.zeros(self.nscans, dtype=np.int32)
         self.Noise10 = np.zeros(self.nscans, dtype='float')
         self.Noise19 = np.zeros(self.nscans, dtype='float')
         self.Noise37 = np.zeros(self.nscans, dtype='float')
@@ -1170,9 +1212,12 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     #########################################
 
     def _get_data_subsection(self, var=None, ind1=None, ind2=None,
-                             maneuver=True):
+                             maneuver=True, show_qc=False):
         """Subsections the data for later plotting"""
-        zdata = 1.0 * getattr(self, 'TB'+var.upper())
+        if show_qc:
+            zdata = 1.0 * getattr(self, 'qctb'+var.lower())
+        else:
+            zdata = 1.0 * getattr(self, 'TB'+var.upper())
         zdata = zdata[ind1:ind2]
         plon = 1.0 * getattr(self, 'Longitude')
         plon = plon[ind1:ind2]
@@ -1354,8 +1399,10 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     #########################################
 
-    def _get_list_of_channels_to_plot(self, show_pol=False):
+    def _get_list_of_channels_to_plot(self, show_pol=False, show_qc=False):
         """Used by plot_ampr_channels() to figure out what variables to plot"""
+        if show_qc:
+            return ['10A', '10B', '19A', '19B', '37A', '37B', '85A', '85B']
         if show_pol:
             tb_list = ['10V', '10H', '19V', '19H', '37V', '37H', '85V', '85H']
             if (not hasattr(self, 'TB10V') or not hasattr(self, 'TB19V') or not
@@ -1388,11 +1435,14 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     #########################################
 
-    def _get_colormap(self, cmap, flag):
+    def _get_colormap(self, cmap, flag, qc_flag=False):
         """Figure out colormap based on user input"""
         if cmap is None:
             if flag:
-                cmap = amprTB_cmap
+                if qc_flag:
+                    cmap = amprQC_cmap
+                else:
+                    cmap = amprTB_cmap
             else:
                 cmap = cm.GMT_wysiwyg
         return cmap
@@ -1603,12 +1653,12 @@ def _get_sod(hour=None, minute=None, second=None):
 def _method_footer_printout():
     """Helps clarify text output"""
     print('********************')
-    print()
+    print('')
 
 
 def _method_header_printout():
     """Helps clarify text output"""
-    print()
+    print('')
     print('********************')
 
 

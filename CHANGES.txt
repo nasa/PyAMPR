@@ -1,10 +1,16 @@
 Change Log
 ----------
+v1.5 major changes (07/08/2015):
+1. Made PyAMPR and its notebooks work under Python 3.4. Python 2.7 still supported, but
+   users may have to install transition modules like six, etc.
+2. Add capability to display QC flags, which are available in IPHEx and later datasets.
+   Use the show_qc Boolean keyword in the display routines (e.g., plot_ampr_track).
+3. Added ability to change resolution of Basemap in plot_ampr_track, via the resolution
+   keyword.
+
 v1.4.2 major changes (07/06/2015):
 1. Updated netCDF read routines to account for IPHEx 37 GHz channel swap being fixed.
 2. Made all code pep8 compliant.
-3. Made PyAMPR and its notebooks work under Python 3.4. Python 2.7 still supported, but
-   users may have to install transition modules like six, etc.
 
 v1.4.1 major changes (06/26/2015):
 1. Updated netCDF read routines to be able to handle lab data with no geolocations.
