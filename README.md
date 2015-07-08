@@ -5,8 +5,8 @@ LATEST VERSION OF THE DATASET, AS WE HAVE FIXED THE 37 GHZ CHANNEL A AND B SWAP 
 
 Title/Version
 -------------
-Python AMPR Data Toolkit (PyAMPR) v1.4.2
-Last changed 07/06/2015
+Python AMPR Data Toolkit (PyAMPR) v1.5
+Last changed 07/08/2015
 
 
 Lead Author

@@ -2,24 +2,24 @@
 Program: udf_cmap.py
 
 
-Purpose: Define colormap to be used for plotting AMPR brightness temperatures.
+Purpose: Define colormaps to be used for plotting AMPR data.
 
 
 Description: A colormap is defined with relatively sharp transitions to
-             help highlight transitions in observed brightness temperatures.
-
+             help highlight transitions in observed data.
 
 
 Author: Brent Roberts, jason.b.roberts@nasa.gov
+Contributor: Timothy Lang, timothy.j.lang@nasa.gov
 
-Rev 1.0, 05.04.2014
-
+Rev 1.1, 07.08.2015 - Added amprQC_cmap
+Rev 1.0, 05.04.2014 - Created amprTB_cmap
 
 """
 from __future__ import absolute_import
 
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 
 # Specify colors in list:
 rgb = []
@@ -93,3 +93,8 @@ cdict['blue'] = [tuple([xvals[x], rgbarray[x, 2], rgbarray[x, 2]])
                  for x in np.arange(nrows)]
 
 amprTB_cmap = LinearSegmentedColormap('testcmap', cdict)
+
+# amprQC_cmap definition - TJL
+qc_colors = ['#000000', '#33CC33', '#66FF33', '#FFFF00',
+             '#FFCC00', '#FF0000']
+amprQC_cmap = ListedColormap(qc_colors)

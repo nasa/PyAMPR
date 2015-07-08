@@ -1,19 +1,22 @@
 """
-google_earth_tools v1.2
+google_earth_tools v1.3
 Collator and Editor - Timothy J. Lang of NASA MSFC (timothy.j.lang@nasa.gov)
 Library of tools for creating KMZ files. Amalgamated from several sources and
 edited. Requires simplekml from https://code.google.com/p/simplekml/.
-Also requires numpy, and matplotlib. Tested with Python 2.7.
-Last edited - 9/24/2014
+Also requires numpy, and matplotlib. Tested with Python 2.7 and 3.4.
+Last edited - 07/08/2015
 
 Change Log
 ----------
-v1.2 major changes:
+v1.3 Major Changes (07/08/2015)
+1. Made code pep8 and Python 3.4 compatible.
+
+v1.2 Major Changes (09/24/2014):
 1. Deleted kml_contour, kml_begin, kml_end, line begin, line_end,
    and place_label functions as the write_ampr_kml method was removed
    from pyampr.AmprTb, given the superior write_ampr_kmz method.
 
-v1.1 major changes:
+v1.1 Major Changes:
 1. Added timespan stamping capability via passing the times string list as
    an argument to make_kml().
 
