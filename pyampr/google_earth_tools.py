@@ -23,15 +23,14 @@ v1.1 Major Changes:
 """
 from __future__ import absolute_import
 from __future__ import print_function
+import numpy as np
+import matplotlib.pyplot as plt
 try:
     from simplekml import (Kml, OverlayXY, ScreenXY, Units, RotationXY,
                            AltitudeMode, Camera)
     SIMPLEKML_FLAG = True
 except ImportError:
     SIMPLEKML_FLAG = False
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 
 def gearth_fig(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, pixels=1024):
