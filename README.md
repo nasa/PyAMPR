@@ -49,7 +49,7 @@ Dependencies: Python 2.7 or 3.4, `numpy`, `matplotlib`, `Basemap`,
               `codecs`, `gzip`, `netCDF4`
 Most of these are provided with standard Python distributions.
 You may need to install `Basemap` via your Python distribution's
-package directory. The `simplekml` package can be found [here.](https://pypi.python.org/pypi/simplekml/)
+package manager. The `simplekml` package can be found [here.](https://pypi.python.org/pypi/simplekml/)
 
 In the same directory as this `README` is `setup.py`, to install this
 package enter the following command at the prompt:
