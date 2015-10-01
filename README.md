@@ -44,34 +44,39 @@ deconvolution is available.
 
 Installation and Use
 --------------------
-Dependencies: Python 2.7 or 3.4, NumPy, matplotlib, Basemap,
-              PyLab, os, time, simplekml, datetime, calendar, 
-              codecs, gzip, netCDF4
+Dependencies: Python 2.7 or 3.4, `numpy`, `matplotlib`, `Basemap`,
+              `os`, `time`, `simplekml`, `datetime`, `calendar`, 
+              `codecs`, `gzip`, `netCDF4`
 Most of these are provided with standard Python distributions.
-You may need to install Basemap via your Python distribution's
-package directory. The simplekml package can be found at 
-https://pypi.python.org/pypi/simplekml/
+You may need to install `Basemap` via your Python distribution's
+package directory. The `simplekml` package can be found [here.](https://pypi.python.org/pypi/simplekml/)
 
-In the same directory as this README is setup.py, to install this
+In the same directory as this `README` is `setup.py`, to install this
 package enter the following command at the prompt:
+```
 python setup.py install
+```
 
 Then to import, in your python program include:
+```
 import pyampr
+```
 
 To read an AMPR TB file type:
+```
 ampr_data = pyampr.AmprTb('FILE_NAME_HERE', project='PROJECT_NAME_HERE')
+```
 
 Then the ampr_data object will have access to all the plotting and analysis 
-methods. Use 'help(pyampr.AmprTb)' to find out more.
+methods. Use `help(pyampr.AmprTb)` to find out more.
 
-In particular, 'help(pyampr.AmprTb.read_ampr_tb_level2b)' will give a full 
+In particular, `help(pyampr.AmprTb.read_ampr_tb_level2b)` will give a full 
 rundown on the data structure.
 
 A demonstration IPython notebook can be found in the notebooks directory.
 
 A simple interactive testing notebook is available in the test directory.
 
-The following conference presentation describes PyAMPR (among other modules):
-https://ams.confex.com/ams/95Annual/webprogram/Paper262779.html
+This [conference presentation](https://ams.confex.com/ams/95Annual/webprogram/Paper262779.html) describes PyAMPR (among other modules).
+
 
