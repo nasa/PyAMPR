@@ -12,7 +12,6 @@ import gzip
 import codecs
 from .google_earth_tools import gearth_fig, make_kml
 from netCDF4 import Dataset, num2date, date2num
-from six.moves import range
 
 try:
     from .udf_cmap import amprTB_cmap, amprQC_cmap
@@ -877,7 +876,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             self._set_timestring_and_sod(index)
 
             # Get TBs, Latitudes, Longitudes, etc.
-            for i in range(self.swath_size):
+            for i in np.arange(self.swath_size):
 
                 if self.Project == 'IPHEX':
                     self._fill_2011on_ampr_variables(line_split, index, i)
@@ -1132,7 +1131,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     def _fill_epoch_time(self):
         """Calculate Epoch_Time attribute"""
         self.Epoch_Time = 0 * self.Second
-        for i in range(self.nscans):
+        for i in np.arange(self.nscans):
             self.Epoch_Time[i] = calendar.timegm(
                 (int(self.Year[i]), int(self.Month[i]), int(self.Day[i]),
                  int(self.Hour[i]), int(self.Minute[i]), int(self.Second[i])))
