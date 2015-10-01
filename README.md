@@ -5,24 +5,24 @@ LATEST VERSION OF THE DATASET, AS WE HAVE FIXED THE 37 GHZ CHANNEL A AND B SWAP 
 
 Title/Version
 -------------
-Python AMPR Data Toolkit (PyAMPR) v1.5
-Last changed 07/08/2015
+Python AMPR Data Toolkit (PyAMPR) v1.5  
+Last changed 07/08/2015  
 
 
 Lead Author
 -----------
-Timothy Lang
-NASA MSFC
-timothy.j.lang@nasa.gov
-(256) 961-7861
+Timothy Lang  
+NASA MSFC  
+timothy.j.lang@nasa.gov  
+(256) 961-7861  
 
 
 Contributing Authors
 --------------------
-Brent Roberts
-NASA MSFC
-jason.b.roberts@nasa.gov
-(256) 961-7477
+Brent Roberts  
+NASA MSFC  
+jason.b.roberts@nasa.gov  
+(256) 961-7477  
 
 
 Overview
