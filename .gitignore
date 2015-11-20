@@ -1,0 +1,15 @@
+build
+*.pyc
+*.bak
+notebooks/*.png
+notebooks/*.kmz
+pyampr/old
+pyampr/*.bak
+notebooks/.ipynb*
+test/.ipynb*
+test/*.kmz
+test/overlay.png
+test/legend.png
+test/QC_Colorbar_Testing.ipynb
+test/Python_2to3_Transition.ipynb
+
