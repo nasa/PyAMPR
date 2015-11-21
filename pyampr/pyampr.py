@@ -19,7 +19,7 @@ try:
 except ImportError:
     CMAP_FLAG = False
 
-VERSION = '1.5'
+VERSION = '1.5.1'
 
 # Fixed constants used by PyAMPR set here
 DEFAULT_CLEVS = [75, 325]
@@ -30,7 +30,7 @@ DEFAULT_SWATH_SIZE = 50
 DEFAULT_NAV_SIZE = 18
 DEFAULT_BAD_DATA = -999.0
 DEFAULT_SWATH_LEFT = -44.1
-DEFAULT_PROJECT_NAME = 'IPHEX'
+DEFAULT_PROJECT_NAME = 'OLYMPEX'
 
 #######################
 # Main class definition
@@ -62,8 +62,9 @@ data from this site, as well as IPHEX. Depending on project,
 some variables are unused or are duplicates. Most notably,
 pre-MC3E there are no B channels.
 
-Currently available field projects: IPHEX, MC3E, TC4, TCSP, JAX90, COARE,
-CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA, FIRE3ACE, CAPE
+Currently available field projects: OLYMPEX, IPHEX, MC3E, TC4, TCSP, JAX90,
+COARE, CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA, FIRE3ACE,
+CAPE
 If you read one project's data while mistakenly telling PyAMPR the data
 are from a different project, then errors are likely.
 
@@ -91,7 +92,7 @@ TB37A, TB37B - 37 GHz brightness temperatures (V->H, H->V, K)
 TB85A, TB85B - 85 GHz brightness temperatures (V->H, H->V, K)
 Latitude, Longitude -  Geolocation for the AMPR beam (degrees)
 Land_Fraction10 - Estimated fraction of land in 10/19 GHz pixel
-Land_Fraction19 - Estimated fraction of land in 19 GHz pixel (IPHEx only)
+Land_Fraction19 - Estimated fraction of land in 19 GHz pixel (IPHEX only)
 Land_Fraction37 - Estimated fraction of land in 37 GHz pixel
 Land_Fraction85 - Estimated fraction of land in 85 GHz pixel
     (0 = All Ocean, 1 = All Land)
@@ -146,7 +147,9 @@ processed AMPR instrument files will be provided in a netCDF-4 format.
                         save=None, show_track=False, maneuver=True,
                         scanrange=None, show_grid=True, equator=False,
                         timerange=None, return_flag=False, show_qc=False,
-                        resolution='l'):
+                        resolution='l', projection='lcc', area_thresh=1000.0,
+                        basemap=None, ax=None, fig=None, title_flag=True,
+                        colorbar_label=True, verbose=False, grid_labels=True):
 
         """
 This method plots geolocated AMPR data, along with the Aircraft track if
@@ -186,11 +189,22 @@ return_flag = Set to True to return Basemap, plot axes, etc. Order of items
               cbar (colorbar instance).
 show_qc = Set to True to show QC flags instead of TB variables.
 resolution = Resolution of Basemap ('c', 'l', 'i', 'h')
+area_thresh = Area (km^2) below which map features are not shown.
+projection = Map projection to use.
+basemap = Basemap instance to use. None means a new one will be created using
+          information from latrange, lonrange, etc.
+ax, fig = Matplotlib Axes and Figure objects. Either both must be None
+          or both must be valid objects for the plot to work right.
+title_flag = Set to False to suppress a title
+colorbar_label = Set to False to suppress the colorbar label
+verbose = Set to True for text output
+grid_labels = Flag for turning on or off labels for the lat/lon gridlines
         """
 
-        plt.close()  # mpl seems buggy if you don't clean up old windows
-        _method_header_printout()
-        print('plot_ampr_track():')
+        # plt.close()  # mpl seems buggy if you don't clean up old windows
+        if verbose:
+            _method_header_printout()
+            print('plot_ampr_track():')
 
         # 10 GHz (A) channel plotted by default if mistake made
         if not isinstance(var, str):
@@ -199,13 +213,14 @@ resolution = Resolution of Basemap ('c', 'l', 'i', 'h')
         # Check to make sure data exist!
         if not hasattr(self, 'TB'+var.upper()):
             self._missing_channel_printout()
-            _method_footer_printout()
+            if verbose:
+                _method_footer_printout()
             return
 
         # Check that QC data exist
         show_qc, clevs = self._check_qc(show_qc, clevs)
 
-        if self.Year[0] < 2011:
+        if self.Year[0] < 2011 and verbose is True:
             print('Warning: Older projects commonly had bad or missing',
                   'geolocation data.')
             print('If there are plotting problems, try a strip chart with',
@@ -215,46 +230,60 @@ resolution = Resolution of Basemap ('c', 'l', 'i', 'h')
         # Adjustable scan range limits
         # Fairly robust - will go down to a width of 10 scans or so before
         # plotting artifacts begin to occur.
-        ind1, ind2 = self._get_scan_indices(scanrange, timerange)
-        plon, plat, zdata = self._get_data_subsection(var, ind1, ind2,
-                                                      maneuver, show_qc)
-        plon, plat, zdata = self._filter_bad_geolocations(plon, plat,
-                                                          zdata, equator)
+        ind1, ind2 = self._get_scan_indices(scanrange, timerange, verbose)
+        plon, plat, zdata = self._get_data_subsection(
+            var, ind1, ind2, maneuver, show_qc, verbose)
+        plon, plat, zdata = self._filter_bad_geolocations(
+            plon, plat, zdata, equator, verbose)
         enough_data = self._check_for_enough_data_to_plot(plon, plat)
         if not enough_data:
             return
 
         latrange, lonrange = self._get_latrange_lonrange(
             plat, plon, latrange, lonrange)
-        self._check_aspect_ratio(latrange, lonrange)
+        self._check_aspect_ratio(latrange, lonrange, verbose)
+        ax, fig = parse_ax_fig(ax, fig)
 
-        # Create Basemap instance
-        lon_0 = np.median(plon)
-        lat_0 = np.median(plat)
-        llcrnrlat = np.min(latrange)
-        urcrnrlat = np.max(latrange)
-        llcrnrlon = np.min(lonrange)
-        urcrnrlon = np.max(lonrange)
-        fig = plt.figure(figsize=(8, 8))
-        ax = fig.add_axes([0.1, 0.15, 0.8, 0.8])
-        m = Basemap(projection='merc', lon_0=lon_0, lat_0=lat_0,
-                    llcrnrlat=llcrnrlat, urcrnrlat=urcrnrlat,
-                    llcrnrlon=llcrnrlon, urcrnrlon=urcrnrlon,
-                    resolution=resolution)
-        m.drawcoastlines()
-        m.drawstates()
-        m.drawcountries()
+        if basemap is None:
+            # Create Basemap instance
+            lon_0 = np.median(plon)
+            lat_0 = np.median(plat)
+            llcrnrlat = np.min(latrange)
+            urcrnrlat = np.max(latrange)
+            llcrnrlon = np.min(lonrange)
+            urcrnrlon = np.max(lonrange)
+            m = Basemap(projection=projection, lon_0=lon_0, lat_0=lat_0,
+                        llcrnrlat=llcrnrlat, urcrnrlat=urcrnrlat, ax=ax,
+                        llcrnrlon=llcrnrlon, urcrnrlon=urcrnrlon,
+                        resolution=resolution, area_thresh=area_thresh)
+
+        else:
+            m = basemap
+
+        m.drawcoastlines(ax=ax)
+        m.drawstates(ax=ax)
+        m.drawcountries(ax=ax)
+        m.fillcontinents(color='#CCB299', lake_color='#CEECF5',
+                         ax=ax, zorder=0)
+        m.drawmapboundary(fill_color='#CEECF5', ax=ax)
 
         if show_grid:
             # Draw parallels
             vparallels = np.arange(np.floor(np.min(latrange)),
                                    np.ceil(np.max(latrange)), parallels)
-            m.drawparallels(vparallels, labels=[1, 0, 0, 0], fontsize=10)
-
+            if grid_labels:
+                labels = [1, 0, 0, 0]
+            else:
+                labels = [0, 0, 0, 0]
+            m.drawparallels(vparallels, labels=labels, fontsize=10, ax=ax)
             # Draw meridians
+            if grid_labels:
+                labels = [0, 0, 0, 1]
+            else:
+                labels = [0, 0, 0, 0]
             vmeridians = np.arange(np.floor(np.min(lonrange)),
                                    np.ceil(np.max(lonrange)), meridians)
-            m.drawmeridians(vmeridians, labels=[0, 0, 0, 1], fontsize=10)
+            m.drawmeridians(vmeridians, labels=labels, fontsize=10, ax=ax)
             del vparallels, vmeridians
 
         # Compute map proj coordinates
@@ -263,41 +292,44 @@ resolution = Resolution of Basemap ('c', 'l', 'i', 'h')
         # Draw filled contours
         cmap = self._get_colormap(cmap, CMAP_FLAG, show_qc)
         cs = m.pcolormesh(x, y, zdata, vmin=np.min(clevs),
-                          vmax=np.max(clevs), cmap=cmap)
+                          vmax=np.max(clevs), cmap=cmap, ax=ax)
 
         # Add Aircraft track
         if show_track:
             x1, y1 = m(self.Aircraft_Nav['GPS Longitude'][ind1:ind2],
                        self.Aircraft_Nav['GPS Latitude'][ind1:ind2])
-            m.plot(x1, y1, 'k.')  # Black dots during normal flight
+            m.plot(x1, y1, 'k.', ax=ax)  # Black dots during normal flight
             indices = np.where(
                 np.abs(self.Aircraft_Nav['Roll'][ind1:ind2]) >= 5)
             # White dots during maneuvers
-            m.plot(x1[indices[0]], y1[indices[0]], 'w.')
+            m.plot(x1[indices[0]], y1[indices[0]], 'w.', ax=ax)
 
         # Plot title & display
-        if title is None:
-            title = str(self._get_ampr_title(var)) + \
-                str(self._get_date_string(ind1)) + \
-                str(', ') + str(self.Time_String[ind1]) + str('-') + \
-                str(self.Time_String[ind2-1]) + str(' UTC')
-        plt.title(title)
+        if title_flag:
+            if title is None:
+                title = str(self._get_ampr_title(var)) + '\n' + \
+                    str(self._get_date_string(ind1)) + \
+                    str(', ') + str(self.Time_String[ind1]) + str('-') + \
+                    str(self.Time_String[ind2-1]) + str(' UTC')
+            ax.set_title(title)
 
         # Add colorbar
         # Colorbar independent of Basemap
-        cax = fig.add_axes([0.20, 0.07, 0.60, 0.02])
-        cbar = plt.colorbar(cs, cax=cax, orientation='horizontal',
-                            extend='both')
-        cbar = self._adjust_colorbar(cbar, show_qc)
+        # cax = fig.add_axes([0.20, 0.07, 0.60, 0.02])
+        # cbar = plt.colorbar(cs, cax=cax, orientation='horizontal',
+        #                     extend='both')
+        cbar = plt.colorbar(cs, ax=ax, orientation='vertical',
+                            extend='both', shrink=0.75)
+        cbar = self._adjust_colorbar(cbar, show_qc, colorbar_label)
 
-        # Save file
+        # Save image to file
         if save is not None:
             plt.savefig(save)
 
-        _method_footer_printout()
-
+        if verbose:
+            _method_footer_printout()
         if return_flag:
-            return fig, ax, m, cax, cbar
+            return fig, ax, m, cbar  # cax, cbar
 
     #########################################
 
@@ -865,7 +897,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             line_split = line.split()
 
             # Header info
-            if self.Project == 'IPHEX' or self.Project == 'MC3E':
+            if self.Project in ['OLYMPEX', 'IPHEX', 'MC3E']:
                 # 2011+, header info placed before TBs
                 self._fill_2011on_header_info(line_split, index)
             else:
@@ -896,13 +928,13 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                     # self.Incidence_Angle[index, i] = float(line_split[i
                     # +27+13*self.swath_size])
 
-                elif self.Project == 'MC3E':
+                elif self.Project in ['OLYMPEX', 'MC3E']:
                     self._fill_2011on_ampr_variables(line_split, index, i)
 
                 else:  # Pre-MC3E projects
                     self._fill_pre2011_ampr_variables(line_split, index, i)
 
-            if self.Project == 'IPHEX' or self.Project == 'MC3E':
+            if self.Project in ['OLYMPEX', 'IPHEX', 'MC3E']:
                 # Aircraft_Nav out of order to improve efficiency
                 # for 2011+ projects
                 self._fill_2011on_aircraft_info(line_split, index)
@@ -917,7 +949,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     #########################################
 
     def _filter_bad_geolocations(self, plon=None, plat=None, zdata=None,
-                                 equator=False):
+                                 equator=False, verbose=True):
         """
         Internal method to filter bad geolocation data.
         Called by following:
@@ -931,9 +963,10 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         condition = np.logical_or(cond1, cond2)
         indices = np.where(condition)
         if np.shape(indices)[1] > 0:
-            print(np.shape(indices)[1],
-                  'bad geolocation(s) (e.g., ' + str(self.bad_data) +
-                  's) exist, attempting correction.')
+            if verbose:
+                print(np.shape(indices)[1],
+                      'bad geolocation(s) (e.g., ' + str(self.bad_data) +
+                      's) exist, attempting correction.')
             zdata = np.delete(zdata, indices[0], axis=0)
             plon = np.delete(plon, indices[0], axis=0)
             plat = np.delete(plat, indices[0], axis=0)
@@ -945,11 +978,12 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             condition = np.logical_or(cond1, cond2)
             indices = np.where(condition)
             if np.shape(indices)[1] > 0:
-                print(np.shape(indices)[1],
-                      'bad geolocation(s) (0s/-1s) exist,',
-                      'attempting correction.')
-                print('If aircraft crossed Equator or Prime Meridian,',
-                      'try keyword equator=True.')
+                if verbose:
+                    print(np.shape(indices)[1],
+                          'bad geolocation(s) (0s/-1s) exist,',
+                          'attempting correction.')
+                    print('If aircraft crossed Equator or Prime Meridian,',
+                          'try keyword equator=True.')
                 zdata = np.delete(zdata, indices[0], axis=0)
                 plon = np.delete(plon, indices[0], axis=0)
                 plat = np.delete(plat, indices[0], axis=0)
@@ -965,9 +999,10 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         condition = np.logical_or(cond1, cond2)
         indices = np.where(condition)
         if np.shape(indices)[1] > 0:
-            print(np.shape(indices)[1],
-                  'scan(s) with high intra-scan geolocation variance exist,',
-                  'attempting correction.')
+            if verbose:
+                print(np.shape(indices)[1],
+                      'scan(s) with high intra-scan geolocation variance',
+                      'exist, attempting correction.')
             zdata = np.delete(zdata, indices[0], axis=0)
             plon = np.delete(plon, indices[0], axis=0)
             plat = np.delete(plat, indices[0], axis=0)
@@ -975,7 +1010,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     #########################################
 
-    def _get_scan_indices(self, scanrange=None, timerange=None):
+    def _get_scan_indices(self, scanrange=None, timerange=None, verbose=True):
 
         """
         Internal method to get scan indices. Used by:
@@ -988,22 +1023,27 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         dates and call for each date separately.
 
         """
-        print('Available scans =', np.min(self.Scan), 'to', np.max(self.Scan))
-        print('Available times =', str(self.Time_String[0]), str('-'),
-              str(self.Time_String[self.nscans-1]))
+        if verbose:
+            print('Available scans =',
+                  np.min(self.Scan), 'to', np.max(self.Scan))
+            print('Available times =', str(self.Time_String[0]), str('-'),
+                  str(self.Time_String[self.nscans-1]))
         if not scanrange and not timerange:
             ind1, ind2 = self._get_min_max_indices()
 
         elif scanrange is not None and timerange is None:
             indices = np.where(self.Scan == np.min(scanrange))
             if np.shape(indices[0])[0] == 0:
-                print('Scan number too small, using first scan for beginning')
+                if verbose:
+                    print('Scan number too small,',
+                          'using first scan for beginning')
                 ind1 = 0
             else:
                 ind1 = indices[0][0]
             indices = np.where(self.Scan == np.max(scanrange))
             if np.shape(indices[0])[0] == 0:
-                print('Scan number too high, using last scan for end')
+                if verbose:
+                    print('Scan number too high, using last scan for end')
                 ind2 = self.nscans
             else:
                 ind2 = indices[0][0]
@@ -1024,22 +1064,26 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                     ind1 = np.min(indices[0])
                     ind2 = np.max(indices[0])
                 else:
-                    _print_times_not_valid()
+                    if verbose:
+                        _print_times_not_valid()
                     ind1, ind2 = self._get_min_max_indices()
             except:
-                _print_times_not_valid()
+                if verbose:
+                    _print_times_not_valid()
                 ind1, ind2 = self._get_min_max_indices()
 
         return ind1, ind2
 
     #########################################
 
-    def _adjust_colorbar(self, cbar, show_qc):
+    def _adjust_colorbar(self, cbar, show_qc, colorbar_label=True):
         if show_qc:
             cbar.set_ticks([1, 2, 3, 4, 5])
-            cbar.set_label('QC Flag')
+            if colorbar_label:
+                cbar.set_label('QC Flag')
         else:
-            cbar.set_label('Brightness Temperature (K)')
+            if colorbar_label:
+                cbar.set_label('Brightness Temperature (K)')
         return cbar
 
     #########################################
@@ -1143,7 +1187,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         Vectorizing remaining data assignments for unused/duplicate variables
         Project dependent which variables are or are not used
         """
-        if self.Project == 'IPHEX' or self.Project == 'MC3E':
+        if self.Project in ['OLYMPEX', 'IPHEX', 'MC3E']:
             self.Noise10[:] = self.bad_data
             self.Noise19[:] = self.bad_data
             self.Noise37[:] = self.bad_data
@@ -1211,7 +1255,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     #########################################
 
     def _get_data_subsection(self, var=None, ind1=None, ind2=None,
-                             maneuver=True, show_qc=False):
+                             maneuver=True, show_qc=False, verbose=True):
         """Subsections the data for later plotting"""
         if show_qc:
             zdata = 1.0 * getattr(self, 'qctb'+var.lower())
@@ -1223,7 +1267,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         plat = 1.0 * getattr(self, 'Latitude')
         plat = plat[ind1:ind2]
         if not maneuver:
-            print('Filtering out significant aircraft maneuvers')
+            if verbose:
+                print('Filtering out significant aircraft maneuvers')
             roll = self.Aircraft_Nav['Roll'][ind1:ind2]
             indices = np.where(np.abs(roll) >= 5)
             if np.shape(indices)[1] > 0:
@@ -1362,7 +1407,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
     #########################################
 
-    def _check_aspect_ratio(self, latrange=None, lonrange=None):
+    def _check_aspect_ratio(self, latrange=None, lonrange=None,
+                            verbose=True):
         """
         Provides a warning if the prospective plot's aspect ratio will
         cause colorbar to be far removed from plot window itself.
@@ -1370,9 +1416,10 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         aspect_ratio = (float(np.max(latrange)) - float(np.min(latrange))) /\
                        (float(np.max(lonrange)) - float(np.min(lonrange)))
         if aspect_ratio < 0.5 or aspect_ratio > 2:
-            print('Warning: Your aspect ratio choice could lead to poor',
-                  'plotting results.')
-            print('Best results are obtained when latrange ~ lonrange.')
+            if verbose:
+                print('Warning: Your aspect ratio choice could lead to poor',
+                      'plotting results.')
+                print('Best results are obtained when latrange ~ lonrange.')
 
     #########################################
 
@@ -1503,8 +1550,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             print('Assuming', project.upper(), 'data structure.')
         print('Change to proper project if incorrect, otherwise errors',
               'will occur.')
-        print('Currently available field projects: IPHEX, MC3E, TC4, TCSP,',
-              'JAX90, COARE,')
+        print('Currently available field projects: OLYMPEX, IPHEX, MC3E, TC4,',
+              'TCSP, JAX90, COARE,')
         print('CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA,',
               'FIRE3ACE, CAPE')
         print('Default: project = \''+DEFAULT_PROJECT_NAME+'\'')
@@ -1628,6 +1675,19 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 ###########################################################
 
 # Stand-alone functions
+
+
+def parse_ax_fig(ax, fig):
+    """ Parse and return ax and fig parameters. """
+    if fig is None:
+        fig = plt.figure(figsize=(8, 8))
+    if ax is None:
+        ax = fig.add_axes([0.1, 0.15, 0.8, 0.8])
+#    if ax is None:
+#        ax = plt.gca()
+#    if fig is None:
+#        fig = plt.gcf()
+    return ax, fig
 
 
 def _get_timestring_and_sod(hour=None, minute=None, second=None):

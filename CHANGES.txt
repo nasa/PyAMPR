@@ -1,5 +1,14 @@
 Change Log
 ----------
+v1.5.1 major changes (11/19/2015):
+1. Offered more Basemap options in AmprTb.plot_ampr_track(), including area_thresh
+   and projection keywords.
+2. Added ability to incorporate other axes/figure objects into AmprTb.plot_ampr_track()
+   calls, which enables multi-panel plots. 
+3. Added independent function called read_aircraft_nav_into_awot to facilitate using
+   AWOT (https://github.com/nguy/AWOT) to help display flight tracks. This does not
+   add AWOT as a dependency (even an optional one).
+
 v1.5 major changes (07/08/2015):
 1. Made PyAMPR and its notebooks work under Python 3.4. Python 2.7 still supported, but
    users may have to install transition modules like six, etc.
