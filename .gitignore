@@ -1,11 +1,11 @@
-build
 *.pyc
 *.bak
+build
 notebooks/*.png
 notebooks/*.kmz
 pyampr/old
 pyampr/*.bak
-notebooks/.ipynb*
+notebooks/.ipynb_checkpoints
 test/.ipynb*
 test/*.kmz
 test/overlay.png
