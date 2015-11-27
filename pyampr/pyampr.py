@@ -9,28 +9,20 @@ import time
 import datetime
 import calendar
 import gzip
+from netCDF4 import Dataset, num2date, date2num
 import codecs
 from .google_earth_tools import gearth_fig, make_kml
-from netCDF4 import Dataset, num2date, date2num
+from .misc_tools import _FourPanelTrack
+from .defaults import (
+    DEFAULT_CLEVS, DEFAULT_GRID_DEL, DEFAULT_VAR, DEFAULT_CHAN_LIST,
+    DEFAULT_SWATH_SIZE, DEFAULT_NAV_SIZE, DEFAULT_BAD_DATA,
+    DEFAULT_SWATH_LEFT, DEFAULT_PROJECT_NAME, VERSION)
 
 try:
     from .udf_cmap import amprTB_cmap, amprQC_cmap
     CMAP_FLAG = True
 except ImportError:
     CMAP_FLAG = False
-
-VERSION = '1.5.1'
-
-# Fixed constants used by PyAMPR set here
-DEFAULT_CLEVS = [75, 325]
-DEFAULT_GRID_DEL = 2.0
-DEFAULT_VAR = '10A'
-DEFAULT_CHAN_LIST = ['10', '19', '37', '85']
-DEFAULT_SWATH_SIZE = 50
-DEFAULT_NAV_SIZE = 18
-DEFAULT_BAD_DATA = -999.0
-DEFAULT_SWATH_LEFT = -44.1
-DEFAULT_PROJECT_NAME = 'OLYMPEX'
 
 #######################
 # Main class definition
@@ -147,7 +139,7 @@ processed AMPR instrument files will be provided in a netCDF-4 format.
                         save=None, show_track=False, maneuver=True,
                         scanrange=None, show_grid=True, equator=False,
                         timerange=None, return_flag=False, show_qc=False,
-                        resolution='l', projection='lcc', area_thresh=1000.0,
+                        resolution='l', projection='lcc', area_thresh=None,
                         basemap=None, ax=None, fig=None, title_flag=True,
                         colorbar_label=True, verbose=False, grid_labels=True):
 
@@ -158,9 +150,11 @@ plotting routine.
 
 var = String with channel number and letter (e.g., 10A for 10 GHz (A) channel
 latrange = List with lat range defined. Order and size (>= 2) is irrelevant
-           as max and min are retrieved
+           as max and min are retrieved. If basemap keyword is defined, then
+           this keyword only affects gridlines.
 lonrange = List with lon range defined. Order and size (>= 2) is irrelevant
-           as max and min are retrieved
+           as max and min are retrieved. If basemap keyword is defined, then
+           this keyword only affects gridlines.
 parallels = Scalar spacing (deg) for parallels (i.e., constant latitude)
 meridians = Scalar spacing (deg) for meridians (i.e., constant longitude)
 ptitle = Plot title as string
@@ -275,7 +269,8 @@ grid_labels = Flag for turning on or off labels for the lat/lon gridlines
                 labels = [1, 0, 0, 0]
             else:
                 labels = [0, 0, 0, 0]
-            m.drawparallels(vparallels, labels=labels, fontsize=10, ax=ax)
+            m.drawparallels(vparallels, labels=labels, fontsize=10, ax=ax,
+                            rotation=90)
             # Draw meridians
             if grid_labels:
                 labels = [0, 0, 0, 1]
@@ -333,10 +328,69 @@ grid_labels = Flag for turning on or off labels for the lat/lon gridlines
 
     #########################################
 
+    def plot_ampr_track_4panel(self, **kwargs):
+
+        """
+This method plots 4 panels of geolocated AMPR data, along with the aircraft
+track if requested. matplotlib.pyplot.pcolormesh() on a Basemap is the
+workhorse plotting routine.
+
+chan = String with channel letter. Default is 'A'
+latrange = List with lat range defined. Order and size (>= 2) is irrelevant
+           as max and min are retrieved. If basemap keyword is defined, then
+           this keyword only affects gridlines.
+lonrange = List with lon range defined. Order and size (>= 2) is irrelevant
+           as max and min are retrieved. If basemap keyword is defined, then
+           this keyword only affects gridlines.
+parallels = Scalar spacing (deg) for parallels (i.e., constant latitude)
+meridians = Scalar spacing (deg) for meridians (i.e., constant longitude)
+ptitle = Plot title as string
+clevs = List with contour levels. Only max and min values are used.
+cmap = Colormap desired.
+       See http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
+       and dir(cm) for more
+save = Filename+path as string to save plot to. Type determined from suffix.
+       Careful - .ps/.eps/.pdf files can get huge!
+show_track = Boolean to plot Aircraft track along with AMPR data.
+             Plotted in black with white highlights for significant maneuvers
+             (abs(Aircraft_Nav['Roll']) > 5).
+scanrange = List of scan numbers (from AmprTb.Scan) to plot.
+            Only max/min are used.
+show_grid = Set to False to turn off gridlines
+equator = Boolean to consider 0s/-1s in Latitude/Longitude as good geolocations
+          (e.g., flight crosses Equator or Prime Meridian).
+          Default is bad geolocations.
+maneuver = Set to False to suppress the plotting of swaths during significant
+           aircraft maneuvers.
+timerange = Time range to plot. Overrides scanrange if both are set.
+            Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
+return_flag = Set to True to return Basemap, plot axes, etc. Order of items
+              returned is fig (figure instance), ax (main axis instance),
+              m (Basemap instance), cax (colorbar axis instance),
+              cbar (colorbar instance).
+show_qc = Set to True to show QC flags instead of TB variables.
+resolution = Resolution of Basemap ('c', 'l', 'i', 'h')
+area_thresh = Area (km^2) below which map features are not shown.
+projection = Map projection to use.
+basemap = Basemap instance to use. None means a new one will be created using
+          information from latrange, lonrange, etc.
+ax, fig = Matplotlib Axes and Figure objects. Either both must be None
+          or both must be valid objects for the plot to work right.
+title_flag = Set to False to suppress a title
+colorbar_label = Set to False to suppress the colorbar label
+verbose = Set to True for text output
+grid_labels = Flag for turning on or off labels for the lat/lon gridlines
+        """
+        fourpan = _FourPanelTrack(self, **kwargs)
+        if 'return_flag' in kwargs.keys():
+            if kwargs['return_flag']:
+                return fourpan
+
+    #########################################
+
     def plot_ampr_channels(self, scanrange=None, cmap=None,
                            clevs=DEFAULT_CLEVS, show_qc=False,
                            save=None, show_pol=False, timerange=None):
-
         """
 This method plots a strip chart akin to those seen here:
 ftp://gpm.nsstc.nasa.gov/gpm_validation/mc3e/ampr/browse/
@@ -356,7 +410,6 @@ show_qc = Set to True to show QC flags instead of TB variables.
           Overrides show_pol.
 timerange = Time range to plot. Overrides scanrange if both are set.
             Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
-
         """
 
         plt.close()  # mpl seems buggy if you don't clean up old windows
