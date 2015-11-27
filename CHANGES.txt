@@ -1,5 +1,16 @@
 Change Log
 ----------
+v1.5.2 major changes (11/26/2015):
+1. Added AmprTb.plot_ampr_track_4panel() method. This method uses the new
+   _FourPanelTrack class in pyampr’s misc_tools to quickly produce a nice-looking
+  four-panel geolocated figure for the A, B, H, or V channels (the latter two
+  require running AmprTb.calc_polarization first).
+2. Moved the PyAMPR default global variables to a separate file.
+3. Default basemap for the track plots now has the land colored light brown, the water
+   light blue, and the latitude labels rotated 90 degrees. Since the basemap can be
+   returned, these can all be modified by the end user.
+4. Demo notebook updates.
+
 v1.5.1 major changes (11/19/2015):
 1. Offered more Basemap options in AmprTb.plot_ampr_track(), including area_thresh
    and projection keywords.
