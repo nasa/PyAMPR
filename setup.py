@@ -14,7 +14,7 @@ try:
 except:
     pass
 
-VERSION = '1.5.1'
+VERSION = '1.5.2'
 
 DESCRIPTION = "The Python Advanced Microwave Precipitation Radiometer " + \
     "Data Toolkit (PyAMPR) - a package to read, analyze, and display AMPR data"

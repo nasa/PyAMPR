@@ -141,7 +141,8 @@ processed AMPR instrument files will be provided in a netCDF-4 format.
                         timerange=None, return_flag=False, show_qc=False,
                         resolution='l', projection='lcc', area_thresh=None,
                         basemap=None, ax=None, fig=None, title_flag=True,
-                        colorbar_label=True, verbose=False, grid_labels=True):
+                        colorbar_label=True, verbose=False, grid_labels=True,
+                        show_borders=True):
 
         """
 This method plots geolocated AMPR data, along with the Aircraft track if
@@ -193,6 +194,7 @@ title_flag = Set to False to suppress a title
 colorbar_label = Set to False to suppress the colorbar label
 verbose = Set to True for text output
 grid_labels = Flag for turning on or off labels for the lat/lon gridlines
+show_borders = False removes coastlines, state/national borders, color filling
         """
 
         # plt.close()  # mpl seems buggy if you don't clean up old windows
@@ -254,12 +256,13 @@ grid_labels = Flag for turning on or off labels for the lat/lon gridlines
         else:
             m = basemap
 
-        m.drawcoastlines(ax=ax)
-        m.drawstates(ax=ax)
-        m.drawcountries(ax=ax)
-        m.fillcontinents(color='#CCB299', lake_color='#CEECF5',
-                         ax=ax, zorder=0)
-        m.drawmapboundary(fill_color='#CEECF5', ax=ax)
+        if show_borders:
+            m.drawcoastlines(ax=ax)
+            m.drawstates(ax=ax)
+            m.drawcountries(ax=ax)
+            m.fillcontinents(color='#CCB299', lake_color='#CEECF5',
+                             ax=ax, zorder=0)
+            m.drawmapboundary(fill_color='#CEECF5', ax=ax)
 
         if show_grid:
             # Draw parallels
