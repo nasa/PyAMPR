@@ -98,7 +98,7 @@ class _FourPanelTrack(object):
             show_grid=self.show_grid, equator=self.equator,
             show_qc=self.show_qc, resolution=self.resolution,
             projection=self.projection, area_thresh=self.area_thresh,
-            basemap=self.basemap, ax=self.ax1, fig=self.fig,
+            basemap=None, ax=self.ax1, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange, return_flag=True)
         try:
             self.basemap = stuff[2]
@@ -116,7 +116,7 @@ class _FourPanelTrack(object):
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
             show_qc=self.show_qc,
-            basemap=self.basemap, ax=self.ax2, fig=self.fig,
+            basemap=None, ax=self.ax2, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange)
         self.ax2.set_title(self.make_title('19', amprtb, ind1, ind2))
 
@@ -129,7 +129,7 @@ class _FourPanelTrack(object):
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
             show_qc=self.show_qc,
-            basemap=self.basemap, ax=self.ax3, fig=self.fig,
+            basemap=None, ax=self.ax3, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange)
         self.ax3.set_title(self.make_title('37', amprtb, ind1, ind2))
 
@@ -142,7 +142,7 @@ class _FourPanelTrack(object):
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
             show_qc=self.show_qc,
-            basemap=self.basemap, ax=self.ax4, fig=self.fig,
+            basemap=None, ax=self.ax4, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange)
         self.ax4.set_title(self.make_title('85', amprtb, ind1, ind2))
 
