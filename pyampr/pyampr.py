@@ -24,6 +24,10 @@ try:
 except ImportError:
     CMAP_FLAG = False
 
+FREQS = ['10', '19', '37', '85']
+POLS = ['H', 'V']
+CHANS = ['A', 'B']
+
 #######################
 # Main class definition
 #######################
@@ -142,7 +146,7 @@ processed AMPR instrument files will be provided in a netCDF-4 format.
                         resolution='l', projection='lcc', area_thresh=None,
                         basemap=None, ax=None, fig=None, title_flag=True,
                         colorbar_label=True, verbose=False, grid_labels=True,
-                        show_borders=True):
+                        show_borders=True, colorbar_flag=True):
 
         """
 This method plots geolocated AMPR data, along with the Aircraft track if
@@ -261,8 +265,8 @@ show_borders = False removes coastlines, state/national borders, color filling
             m.drawstates(ax=ax)
             m.drawcountries(ax=ax)
             m.fillcontinents(color='#CCB299', lake_color='#CEECF5',
-                             ax=ax, zorder=0)
-            m.drawmapboundary(fill_color='#CEECF5', ax=ax)
+                             ax=ax, zorder=1)
+            m.drawmapboundary(fill_color='#CEECF5', ax=ax, zorder=0)
 
         if show_grid:
             # Draw parallels
@@ -290,7 +294,7 @@ show_borders = False removes coastlines, state/national borders, color filling
         # Draw filled contours
         cmap = self._get_colormap(cmap, CMAP_FLAG, show_qc)
         cs = m.pcolormesh(x, y, zdata, vmin=np.min(clevs),
-                          vmax=np.max(clevs), cmap=cmap, ax=ax)
+                          vmax=np.max(clevs), cmap=cmap, ax=ax, zorder=2)
 
         # Add Aircraft track
         if show_track:
@@ -316,9 +320,10 @@ show_borders = False removes coastlines, state/national borders, color filling
         # cax = fig.add_axes([0.20, 0.07, 0.60, 0.02])
         # cbar = plt.colorbar(cs, cax=cax, orientation='horizontal',
         #                     extend='both')
-        cbar = plt.colorbar(cs, ax=ax, orientation='vertical',
-                            extend='both', shrink=0.75)
-        cbar = self._adjust_colorbar(cbar, show_qc, colorbar_label)
+        if colorbar_flag:
+            cbar = plt.colorbar(cs, ax=ax, orientation='vertical',
+                                extend='both', shrink=0.75)
+            cbar = self._adjust_colorbar(cbar, show_qc, colorbar_label)
 
         # Save image to file
         if save is not None:
@@ -762,6 +767,12 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             self.hasNav = False
             print('No navigation data, track plots unavailable ...')
 
+        if 'tbs_10h' in level2b.variables.keys():
+            print('Found deconvolved H & V TBs!')
+            self.hasDeconvolvedHV = True
+        else:
+            self.hasDeconvolvedHV = False
+
         self._initialize_vars_netcdf(level2b)
         self._populate_time_vars_netcdf()
         self._fill_epoch_time()  # defines and populates self.Epoch_Time
@@ -826,6 +837,13 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         self.TB37B = level2b.variables['tbs_37b'][:, :]
         self.TB85A = level2b.variables['tbs_85a'][:, :]
         self.TB85B = level2b.variables['tbs_85b'][:, :]
+
+        if self.hasDeconvolvedHV:
+            for freq in FREQS:
+                for pol in POLS:
+                    setattr(
+                        self, 'TB' + freq + pol,
+                        level2b.variables['tbs_'+freq+pol.lower()][:, :])
 
     #########################################
 
