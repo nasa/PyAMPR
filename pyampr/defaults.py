@@ -1,4 +1,4 @@
-VERSION = '1.5.2'
+VERSION = '1.6'
 
 # Fixed constants used by PyAMPR set here
 DEFAULT_CLEVS = [75, 325]

@@ -58,9 +58,9 @@ data from this site, as well as IPHEX. Depending on project,
 some variables are unused or are duplicates. Most notably,
 pre-MC3E there are no B channels.
 
-Currently available field projects: OLYMPEX, IPHEX, MC3E, TC4, TCSP, JAX90,
-COARE, CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA, FIRE3ACE,
-CAPE
+Currently available field projects: ORACLES, OLYMPEX, IPHEX, MC3E, TC4, TCSP,
+JAX90, COARE, CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA,
+FIRE3ACE, CAPE
 If you read one project's data while mistakenly telling PyAMPR the data
 are from a different project, then errors are likely.
 
@@ -124,7 +124,7 @@ processed AMPR instrument files will be provided in a netCDF-4 format.
 
         try:
             self._read_level2b_netcdf(full_path_and_filename, project=project)
-        except:
+        except IOError:
             print('Not netCDF file, trying ASCII read ...')
             self._read_level2b_ascii(full_path_and_filename, project=project)
         _method_footer_printout()
@@ -748,7 +748,16 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     #################################################################
 
     def _read_level2b_netcdf(self, inputFile, project=DEFAULT_PROJECT_NAME):
-        """Internal method to read new L2 netCDF-format AMPR data files"""
+        """
+        Internal method to read L2 netCDF-format AMPR data files.
+        Accounts for whether the data are from older netCDF formats
+        (2014-2017) or the new CF-compliant format (2017-).
+        
+        Parameters
+        ----------
+        inputFile : str
+            Name of input AMPR data file.
+        """
         # Open the data
         level2b = Dataset(inputFile, mode="r")
 
@@ -758,31 +767,42 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 
         # Assigning project name (self.Project) based on user input
         self._assign_project_name(project)
+        self.keylist = list(level2b.variables.keys())
+        
+        if 'TB' in self.keylist:
+            self.CF_flag = True
+        else:
+            self.CF_flag = False
 
         # Check for navigation
-        if 'lat' in list(level2b.variables.keys()):
+        if 'lat' in self.keylist or 'Lat' in self.keylist:
             print('Found Navigation Data!')
             self.hasNav = True
         else:
             self.hasNav = False
             print('No navigation data, track plots unavailable ...')
 
-        if 'tbs_10h' in level2b.variables.keys():
-            print('Found deconvolved H & V TBs!')
-            self.hasDeconvolvedHV = True
-        else:
-            self.hasDeconvolvedHV = False
-
         self._initialize_vars_netcdf(level2b)
         self._populate_time_vars_netcdf()
         self._fill_epoch_time()  # defines and populates self.Epoch_Time
 
-        if self.hasNav:
-            # Add the geomedateTimes information
-            self.Latitude = level2b.variables['lat'][:, :]
-            self.Longitude = level2b.variables['lon'][:, :]
-            self.Incidence_Angle = level2b.variables['incidence_angle'][:, :]
-            self.Relative_Azimuth = level2b.variables['relative_azimuth'][:, :]
+        if self.hasNav:  # Add the geospatial information
+            if self.CF_flag:
+                self.Latitude = level2b.variables['Lat'][:, :]
+                self.Longitude = level2b.variables['Lon'][:, :]
+                if 'IncidenceAngle' in self.keylist:
+                    self.Incidence_Angle = level2b.variables[
+                        'IncidenceAngle'][:, :]
+                if 'RelativeAzimuth' in self.keylist:
+                    self.Relative_Azimuth = level2b.variables[
+                        'RelativeAzimuth'][:, :]           
+            else:
+                self.Latitude = level2b.variables['lat'][:, :]
+                self.Longitude = level2b.variables['lon'][:, :]
+                self.Incidence_Angle = level2b.variables[
+                    'incidence_angle'][:, :]
+                self.Relative_Azimuth = level2b.variables[
+                    'relative_azimuth'][:, :]
 
         # Add the Calibrated TBs
         self._assign_tbs_netcdf(level2b)
@@ -803,122 +823,265 @@ chan_list = List of strings to enable individual freqs to be deconvolved
     def _initialize_vars_netcdf(self, level2b):
         """
         Helper method to _read_level2b_netcdf()
-        Initializes several variables based on level2b netCDF input
-        """
-        # Handle the times.
-        # Convert to a datetime object
-        self.netcdfTimes = level2b.variables['time']
-        self.dateTimes = num2date(self.netcdfTimes[:], self.netcdfTimes.units)
+        Initializes miscellaneous variables based on level2b netCDF input.
+        Accounts for whether the data are from older netCDF formats
+        (2014-2017) or the new CF-compliant format (2017-).
 
-        # Add the Scan and Swath information.
-        self.nscans = len(level2b.dimensions['scan_number'])
-        self.ncross = len(level2b.dimensions['scan_position'])
-        self.Scan = level2b.variables['scan_number'][:]
-        self.Scan_Position = level2b.variables['scan_position'][:]
-        self.swath_angle = level2b.variables['scan_angle'][:]
-        self.swath_left = self.swath_angle[0]
-        self.swath_size = self.ncross
+        Parameters
+        ----------
+        level2b : netCDF4.Dataset object
+            The Dataset object read in from the AMPR data file.       
+        """
+        # Handle the times, convert to a datetime object
+        # Add the scan and swath information
+        if self.CF_flag:
+            self.netcdfTimes = level2b.variables['Time']
+            self.dateTimes = num2date(self.netcdfTimes[:],
+                                      self.netcdfTimes.units)
+            self.nscans = len(level2b.dimensions['AlongTrackDim'])
+            self.ncross = len(level2b.dimensions['CrossTrackDim'])
+            self.swath_size = self.ncross
+            self.Scan = np.arange(self.nscans, dtype='int') + 1
+            self.Scan_Position = np.arange(self.ncross, dtype='int') + 1
+            if 'ScanAngle' in self.keylist:
+                self.swath_angle = level2b.variables['ScanAngle'][:]
+                self.swath_left = self.swath_angle[0]
+            else:
+                self.swath_left = DEFAULT_SWATH_LEFT
+                self.swath_angle = self.swath_left - \
+                    (2.0 * self.swath_left / float(self.swath_size - 1.0)) * \
+                    np.arange(self.swath_size)
+        else:
+            self.netcdfTimes = level2b.variables['time']
+            self.dateTimes = num2date(self.netcdfTimes[:],
+                                      self.netcdfTimes.units)
+            self.nscans = len(level2b.dimensions['scan_number'])
+            self.ncross = len(level2b.dimensions['scan_position'])
+            self.swath_size = self.ncross
+            self.Scan = level2b.variables['scan_number'][:]
+            self.Scan_Position = level2b.variables['scan_position'][:]
+            self.swath_angle = level2b.variables['scan_angle'][:]
+            self.swath_left = self.swath_angle[0]
+
+        # Common to both formats
         self._initialize_time_fields()
 
     #########################################
 
     def _assign_tbs_netcdf(self, level2b):
-        self.TB10A = level2b.variables['tbs_10a'][:, :]
-        self.TB10B = level2b.variables['tbs_10b'][:, :]
-        self.TB19A = level2b.variables['tbs_19a'][:, :]
-        self.TB19B = level2b.variables['tbs_19b'][:, :]
-        # 37 GHz A & B accidentally swapped during IPHEX
-        # Fixed as of 2 July 2015
-        # if self.Project == 'IPHEX':
-        #     self.TB37A = level2b.variables['tbs_37b'][:,:]
-        #     self.TB37B = level2b.variables['tbs_37a'][:,:]
-        # else:
-        self.TB37A = level2b.variables['tbs_37a'][:, :]
-        self.TB37B = level2b.variables['tbs_37b'][:, :]
-        self.TB85A = level2b.variables['tbs_85a'][:, :]
-        self.TB85B = level2b.variables['tbs_85b'][:, :]
+        """
+        Helper method to _read_level2b_netcdf()
+        Assigns all brightness temperature variables to their appropriate
+        attributes. Accounts for whether the data are from older netCDF
+        formats (2014-2017) or the new CF-compliant format (2017-).
 
-        if self.hasDeconvolvedHV:
+        Parameters
+        ----------
+        level2b : netCDF4.Dataset object
+            The Dataset object read in from the AMPR data file.
+        """
+        if self.CF_flag:
+            tbdata = np.array(level2b.variables['TB'][:, :, :, :])
+            nchan = np.shape(tbdata)[0]
+            self.hasDeconvolvedHV = False
+            if nchan == 1:  # CF files may be from pre-dual-pol era
+                chanlist = [CHANS[0]]
+            elif nchan == 2:
+                chanlist = CHANS
+            else:
+                chanlist = np.concatenate([CHANS, POLS])
+                self.hasDeconvolvedHV = True
+            for j, pol in enumerate(chanlist):
+                for i, freq in enumerate(FREQS):
+                    setattr(self, 'TB' + freq + pol, tbdata[j, i, :, :]) 
+        else:
+            if 'tbs_10h' in self.keylist:
+                self.hasDeconvolvedHV = True
+                chanlist = np.concatenate([CHANS, POLS])
+            else:
+                self.hasDeconvolvedHV = False
+                chanlist = CHANS  # Older netCDF always dual-pol
             for freq in FREQS:
-                for pol in POLS:
+                for pol in chanlist:
                     setattr(
                         self, 'TB' + freq + pol,
                         level2b.variables['tbs_'+freq+pol.lower()][:, :])
+        if self.hasDeconvolvedHV:
+            print('Found deconvolved H & V data!')
 
     #########################################
 
     def _set_old_vars_to_bad_netcdf(self, level2b):
-        self.Icon = self.bad_data * np.ones(self.nscans, dtype=np.int32)
-        self.Noise10 = self.bad_data * np.ones(self.nscans, dtype='float')
-        self.Noise19 = self.bad_data * np.ones(self.nscans, dtype='float')
-        self.Noise37 = self.bad_data * np.ones(self.nscans, dtype='float')
-        self.Noise85 = self.bad_data * np.ones(self.nscans, dtype='float')
-        self.Land_Fraction10 = self.bad_data * np.ones(
-            (self.nscans, self.swath_size), dtype='float')
-        self.Land_Fraction37 = self.bad_data * np.ones(
-            (self.nscans, self.swath_size), dtype='float')
-        self.Land_Fraction85 = self.bad_data * np.ones(
-            (self.nscans, self.swath_size), dtype='float')
-        self.Elevation = self.bad_data * np.ones(
-            (self.nscans, self.swath_size), dtype='float')
+        """
+        Helper method to _read_level2b_netcdf()
+        Checks for presence of older variables in the netCDF file, and
+        if they are not present sets the corresponding attributes to bad.
+        Accounts for whether the data are from older netCDF
+        formats (2014-2017) or the new CF-compliant format (2017-).
+
+        Parameters
+        ----------
+        level2b : netCDF4.Dataset object
+            The Dataset object read in from the AMPR data file.
+        """
+        # Icon (whatever that is ...)
+        if 'Icon' in self.keylist:
+            self.Icon = level2b.variables['Icon'][:]
+        else:
+            self.Icon = self.bad_data * np.ones(self.nscans, dtype=np.int32)
+        # Noise
+        if 'Noise' in self.keylist:
+            for j, freq in enumerate(FREQS):
+                setattr(self, 'Noise' + freq, level2b.variables['Noise'][j, :])
+        else:
+            for freq in FREQS:
+                setattr(self, 'Noise' + freq,
+                        self.bad_data * np.ones(self.nscans, dtype='float'))
+        # Land Fraction
+        for freq in FREQS:
+            setattr(self, 'Land_Fraction' + freq,
+                    self.bad_data * np.ones((self.nscans, self.ncross),
+                                            dtype='float'))
 
     #########################################
 
     def _consider_aircraft_nav_netcdf(self, level2b):
+        """
+        Helper method to _read_level2b_netcdf()
+        Assigns all aircraft navigation variables to their appropriate
+        attributes. Accounts for whether the data are from older netCDF
+        formats (2014-2017) or the new CF-compliant format (2017-).
+
+        Parameters
+        ----------
+        level2b : netCDF4.Dataset object
+            The Dataset object read in from the AMPR data file.
+        """
         self._initialize_aircraft_dict()
         for var in self.Aircraft_varlist:
             self.Aircraft_Nav[var][:] = self.bad_data
-        if self.hasNav:
-            # Now, return a structured array of Aircraft_Nav parameters.
-            print(np.shape(level2b.variables['gLat']))
-            self.Aircraft_Nav['GPS Latitude'] = level2b.variables['gLat'][:]
-            self.Aircraft_Nav['GPS Longitude'] = level2b.variables['gLon'][:]
-            self.Aircraft_Nav['GPS Altitude'] = level2b.variables['gAlt'][:]
-            self.Aircraft_Nav['Pitch'] = level2b.variables['pitch'][:]
-            self.Aircraft_Nav['Roll'] = level2b.variables['roll'][:]
-            self.Aircraft_Nav['Yaw'] = level2b.variables['track_angle'][:]
-            self.Aircraft_Nav['Heading'] = level2b.variables['heading'][:]
-            self.Aircraft_Nav['Ground Speed'] = \
-                level2b.variables['groundSpeed'][:]
-            self.Aircraft_Nav['Air Speed'] = level2b.variables['airSpeed'][:]
-            self.Aircraft_Nav['Static Pressure'] = \
-                level2b.variables['staticPressure'][:]
-            self.Aircraft_Nav['Total Temperature'] = \
-                level2b.variables['totalTemp'][:]
-            self.Aircraft_Nav['Wind Speed'] = \
-                level2b.variables['iWindSpeed'][:]
-            self.Aircraft_Nav['Wind Direction'] = \
-                level2b.variables['iWindDir'][:]
-            self.Aircraft_Nav['INS Latitude'] = level2b.variables['iLat'][:]
-            self.Aircraft_Nav['INS Longitude'] = level2b.variables['iLon'][:]
+        # Now, return a structured array of Aircraft_Nav parameters.
+        if self.hasNav: 
+            if self.CF_flag:
+                self.Aircraft_Nav['GPS Latitude'] = \
+                    level2b.variables['GPSLatitude'][:]
+                self.Aircraft_Nav['GPS Longitude'] = \
+                    level2b.variables['GPSLongitude'][:]                
+                self.Aircraft_Nav['GPS Altitude'] = \
+                    level2b.variables['GPSAltitude'][:]
+                self.Aircraft_Nav['Pitch'] = level2b.variables['Pitch'][:]
+                self.Aircraft_Nav['Roll'] = level2b.variables['Roll'][:]
+                self.Aircraft_Nav['Yaw'] = level2b.variables['Yaw'][:]
+                self.Aircraft_Nav['Heading'] = level2b.variables['Head'][:]
+                self.Aircraft_Nav['Ground Speed'] = \
+                    level2b.variables['GroundSpeed'][:]
+                self.Aircraft_Nav['Air Speed'] = \
+                    level2b.variables['AirSpeed'][:]
+                if 'WindSpeed' in self.keylist:
+                    self.Aircraft_Nav['Wind Speed'] = \
+                        level2b.variables['WindSpeed'][:]
+                if 'WindDirection' in self.keylist:
+                    self.Aircraft_Nav['Wind Direction'] = \
+                        level2b.variables['WindDirection'][:]
+                if 'Pressure' in self.keylist:
+                    self.Aircraft_Nav['Static Pressure'] = \
+                        level2b.variables['Pressure'][:]
+                if 'Temperature' in self.keylist:
+                    self.Aircraft_Nav['Total Temperature'] = \
+                        level2b.variables['Temperature'][:]
+                # INS Lat/Lon ignored in CF datasets
+            else:
+                self.Aircraft_Nav['GPS Latitude'] = \
+                    level2b.variables['gLat'][:]
+                self.Aircraft_Nav['GPS Longitude'] = \
+                    level2b.variables['gLon'][:]
+                self.Aircraft_Nav['GPS Altitude'] = \
+                    level2b.variables['gAlt'][:]
+                self.Aircraft_Nav['Pitch'] = level2b.variables['pitch'][:]
+                self.Aircraft_Nav['Roll'] = level2b.variables['roll'][:]
+                self.Aircraft_Nav['Yaw'] = level2b.variables['track_angle'][:]
+                self.Aircraft_Nav['Heading'] = level2b.variables['heading'][:]
+                self.Aircraft_Nav['Ground Speed'] = \
+                    level2b.variables['groundSpeed'][:]
+                self.Aircraft_Nav['Air Speed'] = \
+                    level2b.variables['airSpeed'][:]
+                self.Aircraft_Nav['Static Pressure'] = \
+                    level2b.variables['staticPressure'][:]
+                self.Aircraft_Nav['Total Temperature'] = \
+                    level2b.variables['totalTemp'][:]
+                self.Aircraft_Nav['Wind Speed'] = \
+                    level2b.variables['iWindSpeed'][:]
+                self.Aircraft_Nav['Wind Direction'] = \
+                    level2b.variables['iWindDir'][:]
+                self.Aircraft_Nav['INS Latitude'] = \
+                    level2b.variables['iLat'][:]
+                self.Aircraft_Nav['INS Longitude'] = \
+                    level2b.variables['iLon'][:]
 
     #########################################
 
     def _consider_qc_flags_netcdf(self, level2b):
-        if 'qctb10a' in level2b.variables:
-            # If one there, assumes all are in file
-            self.qcIncidence = level2b.variables['qcIncidence'][:, :]
-            self.qctb10a = level2b.variables['qctb10a'][:, :]
-            self.qctb10b = level2b.variables['qctb10b'][:, :]
-            self.qctb19a = level2b.variables['qctb19a'][:, :]
-            self.qctb19b = level2b.variables['qctb19b'][:, :]
-            self.qctb37a = level2b.variables['qctb37a'][:, :]
-            self.qctb37b = level2b.variables['qctb37b'][:, :]
-            self.qctb85a = level2b.variables['qctb85a'][:, :]
-            self.qctb85b = level2b.variables['qctb85b'][:, :]
+        """
+        Helper method to _read_level2b_netcdf()
+        Assigns QC variables to their appropriate attributes.
+        Accounts for whether the data are from older netCDF
+        formats (2014-2017) or the new CF-compliant format (2017-).
+
+        Parameters
+        ----------
+        level2b : netCDF4.Dataset object
+            The Dataset object read in from the AMPR data file.
+        """
+        if self.CF_flag:
+            qcdata = np.array(level2b.variables['QC'])
+            if np.ndim(qcdata) != 1:  # Filter out pre-dual-pol QC
+                self.qcIncidence = level2b.variables['IncidenceAngleQC'][:, :]
+                for j, chan in enumerate(CHANS):
+                    for i, freq in enumerate(FREQS):
+                        setattr(self, 'qctb' + freq + chan.lower(),
+                                qcdata[j, i, :, :])                  
+        else:
+            if 'qctb10a' in self.keylist:
+                # If one there, assumes all are in file
+                self.qcIncidence = level2b.variables['qcIncidence'][:, :]
+                for freq in FREQS:
+                    for chan in CHANS:
+                        setattr(
+                            self, 'qctb' + freq + chan,
+                            level2b.variables['qctb'+freq+chan.lower()][:, :])
 
     #########################################
 
     def _consider_land_frac_netcdf(self, level2b):
-        if 'FovWaterFrac10' in level2b.variables:
-            self.Land_Fraction10 = 1.0 - \
-                level2b.variables['FovWaterFrac10'][:, :]
-            self.Land_Fraction19 = 1.0 - \
-                level2b.variables['FovWaterFrac19'][:, :]
-            self.Land_Fraction37 = 1.0 - \
-                level2b.variables['FovWaterFrac37'][:, :]
-            self.Land_Fraction85 = 1.0 - \
-                level2b.variables['FovWaterFrac85'][:, :]
+        """
+        Helper method to _read_level2b_netcdf()
+        Assigns land fraction variables to their appropriate attributes.
+        Accounts for whether the data are from older netCDF
+        formats (2014-2017) or the new CF-compliant format (2017-).
+
+        Parameters
+        ----------
+        level2b : netCDF4.Dataset object
+            The Dataset object read in from the AMPR data file.
+        """
+        if self.CF_flag:
+            if 'LandFraction' in self.keylist:
+                lf = np.array(level2b.variables['LandFraction'])
+                if np.ndim(lf) == 2:
+                    self.Land_Fraction10 = lf
+                else:
+                    for j, freq in enumerate(FREQS):
+                        setattr(self, 'Land_Fraction' + freq, lf[j, :, :])
+        else:
+            if 'FovWaterFrac10' in level2b.variables:
+                self.Land_Fraction10 = 1.0 - \
+                    level2b.variables['FovWaterFrac10'][:, :]
+                self.Land_Fraction19 = 1.0 - \
+                    level2b.variables['FovWaterFrac19'][:, :]
+                self.Land_Fraction37 = 1.0 - \
+                    level2b.variables['FovWaterFrac37'][:, :]
+                self.Land_Fraction85 = 1.0 - \
+                    level2b.variables['FovWaterFrac85'][:, :]
 
     #########################################
 
@@ -971,7 +1134,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             line_split = line.split()
 
             # Header info
-            if self.Project in ['OLYMPEX', 'IPHEX', 'MC3E']:
+            if self.Project in ['ORACLES', 'OLYMPEX', 'IPHEX', 'MC3E']:
                 # 2011+, header info placed before TBs
                 self._fill_2011on_header_info(line_split, index)
             else:
@@ -1002,13 +1165,13 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                     # self.Incidence_Angle[index, i] = float(line_split[i
                     # +27+13*self.swath_size])
 
-                elif self.Project in ['OLYMPEX', 'MC3E']:
+                elif self.Project in ['ORACLES', 'OLYMPEX', 'MC3E']:
                     self._fill_2011on_ampr_variables(line_split, index, i)
 
                 else:  # Pre-MC3E projects
                     self._fill_pre2011_ampr_variables(line_split, index, i)
 
-            if self.Project in ['OLYMPEX', 'IPHEX', 'MC3E']:
+            if self.Project in ['ORACLES', 'OLYMPEX', 'IPHEX', 'MC3E']:
                 # Aircraft_Nav out of order to improve efficiency
                 # for 2011+ projects
                 self._fill_2011on_aircraft_info(line_split, index)
@@ -1261,7 +1424,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         Vectorizing remaining data assignments for unused/duplicate variables
         Project dependent which variables are or are not used
         """
-        if self.Project in ['OLYMPEX', 'IPHEX', 'MC3E']:
+        if self.Project in ['ORACLES', 'OLYMPEX', 'IPHEX', 'MC3E']:
             self.Noise10[:] = self.bad_data
             self.Noise19[:] = self.bad_data
             self.Noise37[:] = self.bad_data
@@ -1292,30 +1455,26 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         Attempting to control for infinite and nan numbers.
         They can blow up plot_ampr_track() and write_ampr_kmz().
         """
-        # infinite check
-        self.TB10A[np.isinf(self.TB10A) == True] = self.bad_data
-        self.TB10B[np.isinf(self.TB10A) == True] = self.bad_data
-        self.TB19A[np.isinf(self.TB19A) == True] = self.bad_data
-        self.TB19B[np.isinf(self.TB19B) == True] = self.bad_data
-        self.TB37A[np.isinf(self.TB37A) == True] = self.bad_data
-        self.TB37B[np.isinf(self.TB37B) == True] = self.bad_data
-        self.TB85A[np.isinf(self.TB85A) == True] = self.bad_data
-        self.TB85B[np.isinf(self.TB85B) == True] = self.bad_data
-        # nan check
-        self.TB10A[np.isnan(self.TB10A) == True] = self.bad_data
-        self.TB10B[np.isnan(self.TB10A) == True] = self.bad_data
-        self.TB19A[np.isnan(self.TB19A) == True] = self.bad_data
-        self.TB19B[np.isnan(self.TB19B) == True] = self.bad_data
-        self.TB37A[np.isnan(self.TB37A) == True] = self.bad_data
-        self.TB37B[np.isnan(self.TB37B) == True] = self.bad_data
-        self.TB85A[np.isnan(self.TB85A) == True] = self.bad_data
-        self.TB85B[np.isnan(self.TB85B) == True] = self.bad_data
+        # infinite and nan check
+        self.TB10A[np.isfinite(self.TB10A) == False] = self.bad_data
+        self.TB19A[np.isfinite(self.TB19A) == False] = self.bad_data
+        self.TB37A[np.isfinite(self.TB37A) == False] = self.bad_data
+        self.TB85A[np.isfinite(self.TB85A) == False] = self.bad_data
+        if hasattr(self, 'TB10B'):  # Assume if one, all are there
+            self.TB10B[np.isfinite(self.TB10B) == False] = self.bad_data
+            self.TB19B[np.isfinite(self.TB19B) == False] = self.bad_data
+            self.TB37B[np.isfinite(self.TB37B) == False] = self.bad_data
+            self.TB85B[np.isfinite(self.TB85B) == False] = self.bad_data
+        else:  # Set all the B channels to bad, these are single-channel data
+            for freq in FREQS:
+                setattr(self, 'TB' + freq + 'B',
+                        self.bad_data * np.ones((self.nscans, self.ncross),
+                                                dtype='float'))
         # Address geolocations if available
         if hasattr(self, 'Latitude'):
-            self.Latitude[np.isinf(self.Latitude) == True] = self.bad_data
-            self.Longitude[np.isinf(self.Longitude) == True] = self.bad_data
-            self.Latitude[np.isnan(self.Latitude) == True] = self.bad_data
-            self.Longitude[np.isnan(self.Longitude) == True] = self.bad_data
+            self.Latitude[np.isfinite(self.Latitude) == False] = self.bad_data
+            self.Longitude[np.isfinite(self.Longitude) == False] = \
+                self.bad_data
 
     #########################################
 
@@ -1624,8 +1783,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             print('Assuming', project.upper(), 'data structure.')
         print('Change to proper project if incorrect, otherwise errors',
               'will occur.')
-        print('Currently available field projects: OLYMPEX, IPHEX, MC3E, TC4,',
-              'TCSP, JAX90, COARE,')
+        print('Currently available field projects: ORACLES, OLYMPEX, IPHEX,',
+              'MC3E, TC4, TCSP, JAX90, COARE,')
         print('CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA,',
               'FIRE3ACE, CAPE')
         print('Default: project = \''+DEFAULT_PROJECT_NAME+'\'')
