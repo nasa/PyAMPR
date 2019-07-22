@@ -2,6 +2,7 @@ from __future__ import print_function
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime as dt
+import cartopy
 from .defaults import DEFAULT_CLEVS, DEFAULT_GRID_DEL
 
 
@@ -52,9 +53,9 @@ class _FourPanelTrack(object):
             'meridians': DEFAULT_GRID_DEL, 'clevs': DEFAULT_CLEVS,
             'cmap': None, 'save': None, 'show_track': False, 'scanrange': None,
             'show_grid': True, 'equator': False, 'maneuver': True,
-            'timerange': None, 'show_qc': False, 'resolution': 'l',
-            'area_thresh': None, 'projection': 'lcc', 'basemap': None,
-            'verbose': False}
+            'timerange': None, 'show_qc': False, 'resolution': '50m',
+            'projection': cartopy.crs.PlateCarree(), 'verbose': False,
+            'wmts_layer': None}
         self.parse_kwargs(**kwargs)
         self.flag = self.construct_plot(amprtb)
 
@@ -84,7 +85,8 @@ class _FourPanelTrack(object):
         pyampr.AmprTb.plot_ampr_track() method.
         """
         self.fig, [[self.ax1, self.ax2], [self.ax3, self.ax4]] = \
-            plt.subplots(2, 2, figsize=(10, 10))
+            plt.subplots(2, 2, figsize=(10, 10),
+                         subplot_kw={'projection': self.projection})
         ind1, ind2 = amprtb._get_scan_indices(
             self.scanrange, self.timerange, False)
 
@@ -92,31 +94,24 @@ class _FourPanelTrack(object):
         stuff = amprtb.plot_ampr_track(
             var='10'+self.chan, latrange=self.latrange,
             lonrange=self.lonrange, parallels=self.parallels,
-            meridians=self.meridians, title='',
+            meridians=self.meridians, title='', wmts_layer=self.wmts_layer,
             clevs=self.clevs, cmap=self.cmap, show_track=self.show_track,
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
             show_qc=self.show_qc, resolution=self.resolution,
-            projection=self.projection, area_thresh=self.area_thresh,
-            basemap=None, ax=self.ax1, fig=self.fig,
+            projection=self.projection, ax=self.ax1, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange, return_flag=True)
-        try:
-            self.basemap = stuff[2]
-        except TypeError:
-            plt.close()
-            return False
         self.ax1.set_title(self.make_title('10', amprtb, ind1, ind2))
 
         # 19 GHz plot
         amprtb.plot_ampr_track(
             var='19'+self.chan, latrange=self.latrange,
             lonrange=self.lonrange, parallels=self.parallels,
-            meridians=self.meridians, title='',
+            meridians=self.meridians, title='', wmts_layer=self.wmts_layer,
             clevs=self.clevs, cmap=self.cmap, show_track=self.show_track,
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
-            show_qc=self.show_qc,
-            basemap=None, ax=self.ax2, fig=self.fig,
+            show_qc=self.show_qc, ax=self.ax2, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange)
         self.ax2.set_title(self.make_title('19', amprtb, ind1, ind2))
 
@@ -124,12 +119,11 @@ class _FourPanelTrack(object):
         amprtb.plot_ampr_track(
             var='37'+self.chan, latrange=self.latrange,
             lonrange=self.lonrange, parallels=self.parallels,
-            meridians=self.meridians, title='',
+            meridians=self.meridians, title='', wmts_layer=self.wmts_layer,
             clevs=self.clevs, cmap=self.cmap, show_track=self.show_track,
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
-            show_qc=self.show_qc,
-            basemap=None, ax=self.ax3, fig=self.fig,
+            show_qc=self.show_qc, ax=self.ax3, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange)
         self.ax3.set_title(self.make_title('37', amprtb, ind1, ind2))
 
@@ -137,14 +131,13 @@ class _FourPanelTrack(object):
         amprtb.plot_ampr_track(
             var='85'+self.chan, latrange=self.latrange,
             lonrange=self.lonrange, parallels=self.parallels,
-            meridians=self.meridians, title='',
+            meridians=self.meridians, title='', wmts_layer=self.wmts_layer,
             clevs=self.clevs, cmap=self.cmap, show_track=self.show_track,
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
-            show_qc=self.show_qc,
-            basemap=None, ax=self.ax4, fig=self.fig,
+            show_qc=self.show_qc, ax=self.ax4, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange)
         self.ax4.set_title(self.make_title('85', amprtb, ind1, ind2))
 
-        plt.tight_layout()
+        # plt.tight_layout()
         return True

@@ -1,5 +1,11 @@
 Change Log
 ----------
+v1.7 major changes (07/22/2019):
+1. Removed Basemap as a dependency.
+2. Added Cartopy as a dependency. All maps (e.g., AmprTb.plot_ampr_track) are now created
+   using Cartopy.
+3. Miscellaneous small updates and bug fixes.
+
 v1.6 major changes (06/30/2017):
 1. Enabled ingest of new CF-compliant formatted netCDF data from various dual-pol
    and pre-dual-pol campaigns.

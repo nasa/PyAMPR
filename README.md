@@ -5,8 +5,8 @@ LATEST VERSION OF THE DATASET, AS WE HAVE FIXED THE 37 GHZ CHANNEL A AND B SWAP 
 
 Title/Version
 -------------
-Python AMPR Data Toolkit (PyAMPR) v1.5.3  
-Last changed 03/03/2017  
+Python AMPR Data Toolkit (PyAMPR) v1.7 
+Last changed 07/22/2019  
 
 
 Lead Author
@@ -44,12 +44,12 @@ deconvolution is available.
 
 Installation and Use
 --------------------
-Dependencies: Python 2.7 or 3.4, `numpy`, `matplotlib`, `Basemap`,
-              `os`, `time`, `simplekml`, `datetime`, `calendar`, 
-              `codecs`, `gzip`, `netCDF4`
+Dependencies: Python 2.7 thru 3.7,  `numpy`,  `matplotlib`,  `cartopy`,
+              `os`,  `time`,  `simplekml`,  `datetime`,  `calendar`, 
+              `codecs`,  `gzip`,  `netCDF4`
 Most of these are provided with standard Python distributions.
-You may need to install `Basemap` via your Python distribution's
-package manager. The `simplekml` package can be found [here.](https://pypi.python.org/pypi/simplekml/)
+You may need to install `cartopy` via your Python distribution's
+package manager. The `simplekml` package can be found [here.](https://pypi.python.org/pypi/simplekml/ )
 
 In the same directory as this `README` is `setup.py`, to install this
 package enter the following command at the prompt:
