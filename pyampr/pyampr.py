@@ -4,26 +4,24 @@ from __future__ import print_function
 from __future__ import unicode_literals
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap, cm
+import matplotlib.ticker as mticker
+from mpl_toolkits.basemap import cm
 import time
 import datetime
 import calendar
 import gzip
 from netCDF4 import Dataset, num2date, date2num
 import codecs
+import cartopy
 from .google_earth_tools import gearth_fig, make_kml
 from .misc_tools import _FourPanelTrack
 from .defaults import (
     DEFAULT_CLEVS, DEFAULT_GRID_DEL, DEFAULT_VAR, DEFAULT_CHAN_LIST,
     DEFAULT_SWATH_SIZE, DEFAULT_NAV_SIZE, DEFAULT_BAD_DATA,
     DEFAULT_SWATH_LEFT, DEFAULT_PROJECT_NAME, VERSION)
+from .udf_cmap import amprTB_cmap, amprQC_cmap
 
-try:
-    from .udf_cmap import amprTB_cmap, amprQC_cmap
-    CMAP_FLAG = True
-except ImportError:
-    CMAP_FLAG = False
-
+CMAP_FLAG = True
 FREQS = ['10', '19', '37', '85']
 POLS = ['H', 'V']
 CHANS = ['A', 'B']
@@ -137,36 +135,35 @@ processed AMPR instrument files will be provided in a netCDF-4 format.
 
     #########################################
 
-    def plot_ampr_track(self, var=DEFAULT_VAR, latrange=None, lonrange=None,
-                        parallels=DEFAULT_GRID_DEL, meridians=DEFAULT_GRID_DEL,
-                        title=None, clevs=DEFAULT_CLEVS, cmap=None,
-                        save=None, show_track=False, maneuver=True,
-                        scanrange=None, show_grid=True, equator=False,
-                        timerange=None, return_flag=False, show_qc=False,
-                        resolution='l', projection='lcc', area_thresh=None,
-                        basemap=None, ax=None, fig=None, title_flag=True,
-                        colorbar_label=True, verbose=False, grid_labels=True,
-                        show_borders=True, colorbar_flag=True):
+    def plot_ampr_track(
+            self, var=DEFAULT_VAR, latrange=None, lonrange=None,
+            parallels=DEFAULT_GRID_DEL, meridians=DEFAULT_GRID_DEL,
+            title=None, clevs=DEFAULT_CLEVS, cmap=None,
+            save=None, show_track=False, maneuver=True,
+            scanrange=None, show_grid=True, equator=False,
+            timerange=None, return_flag=False, show_qc=False,
+            resolution='50m', projection=cartopy.crs.PlateCarree(),
+            ax=None, fig=None, title_flag=True,
+            colorbar_label=True, verbose=False,
+            show_borders=True, colorbar_flag=True,
+            wmts_layer=None):
 
         """
 This method plots geolocated AMPR data, along with the Aircraft track if
-requested. matplotlib.pyplot.pcolormesh() on a Basemap is the workhorse
+requested. matplotlib.pyplot.pcolormesh() on a Cartopy basemap is the workhorse
 plotting routine.
 
 var = String with channel number and letter (e.g., 10A for 10 GHz (A) channel
 latrange = List with lat range defined. Order and size (>= 2) is irrelevant
-           as max and min are retrieved. If basemap keyword is defined, then
-           this keyword only affects gridlines.
+           as max and min are retrieved.
 lonrange = List with lon range defined. Order and size (>= 2) is irrelevant
-           as max and min are retrieved. If basemap keyword is defined, then
-           this keyword only affects gridlines.
+           as max and min are retrieved.
 parallels = Scalar spacing (deg) for parallels (i.e., constant latitude)
 meridians = Scalar spacing (deg) for meridians (i.e., constant longitude)
 ptitle = Plot title as string
 clevs = List with contour levels. Only max and min values are used.
-cmap = Colormap desired.
-       See http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
-       and dir(cm) for more
+cmap = Colormap desired. See, e.g.,
+       https://matplotlib.org/3.1.0/gallery/color/colormap_reference.html
 save = Filename+path as string to save plot to. Type determined from suffix.
        Careful - .ps/.eps/.pdf files can get huge!
 show_track = Boolean to plot Aircraft track along with AMPR data.
@@ -182,23 +179,21 @@ maneuver = Set to False to suppress the plotting of swaths during significant
            aircraft maneuvers.
 timerange = Time range to plot. Overrides scanrange if both are set.
             Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
-return_flag = Set to True to return Basemap, plot axes, etc. Order of items
+return_flag = Set to True to return figure, plot axes, etc. Order of items
               returned is fig (figure instance), ax (main axis instance),
-              m (Basemap instance), cax (colorbar axis instance),
               cbar (colorbar instance).
 show_qc = Set to True to show QC flags instead of TB variables.
-resolution = Resolution of Basemap ('c', 'l', 'i', 'h')
-area_thresh = Area (km^2) below which map features are not shown.
-projection = Map projection to use.
-basemap = Basemap instance to use. None means a new one will be created using
-          information from latrange, lonrange, etc.
+resolution = Resolution of Cartopy map ('10m', '50m', '110m')
+projection = Cartopy map projection to use.
 ax, fig = Matplotlib Axes and Figure objects. Either both must be None
           or both must be valid objects for the plot to work right.
 title_flag = Set to False to suppress a title
 colorbar_label = Set to False to suppress the colorbar label
 verbose = Set to True for text output
-grid_labels = Flag for turning on or off labels for the lat/lon gridlines
-show_borders = False removes coastlines, state/national borders, color filling
+show_borders = False removes coastlines and state/national borders
+wmts_layer = Use this to add a WMTS map layer from
+             https://map1c.vis.earthdata.nasa.gov/wmts-geo/wmts.cgi, like
+             'ASTER_GDEM_Color_Shaded_Relief'
         """
 
         # plt.close()  # mpl seems buggy if you don't clean up old windows
@@ -242,69 +237,56 @@ show_borders = False removes coastlines, state/national borders, color filling
         latrange, lonrange = self._get_latrange_lonrange(
             plat, plon, latrange, lonrange)
         self._check_aspect_ratio(latrange, lonrange, verbose)
-        ax, fig = parse_ax_fig(ax, fig)
+        ax, fig = parse_ax_fig(ax, fig, projection=projection)
 
-        if basemap is None:
-            # Create Basemap instance
-            lon_0 = np.median(plon)
-            lat_0 = np.median(plat)
-            llcrnrlat = np.min(latrange)
-            urcrnrlat = np.max(latrange)
-            llcrnrlon = np.min(lonrange)
-            urcrnrlon = np.max(lonrange)
-            m = Basemap(projection=projection, lon_0=lon_0, lat_0=lat_0,
-                        llcrnrlat=llcrnrlat, urcrnrlat=urcrnrlat, ax=ax,
-                        llcrnrlon=llcrnrlon, urcrnrlon=urcrnrlon,
-                        resolution=resolution, area_thresh=area_thresh)
+        llcrnrlon = np.min(lonrange)
+        urcrnrlon = np.max(lonrange)
+        llcrnrlat = np.min(latrange)
+        urcrnrlat = np.max(latrange)
+        ax.set_extent([llcrnrlon, urcrnrlon, llcrnrlat, urcrnrlat])
 
-        else:
-            m = basemap
+        if wmts_layer is not None:
+            url = 'https://map1c.vis.earthdata.nasa.gov/wmts-geo/wmts.cgi'
+            ax.add_wmts(url, wmts_layer)
 
         if show_borders:
-            m.drawcoastlines(ax=ax)
-            m.drawstates(ax=ax)
-            m.drawcountries(ax=ax)
-            m.fillcontinents(color='#CCB299', lake_color='#CEECF5',
-                             ax=ax, zorder=1)
-            m.drawmapboundary(fill_color='#CEECF5', ax=ax, zorder=0)
+            ax.coastlines(resolution=resolution)
+            countries = cartopy.feature.NaturalEarthFeature(
+                category='cultural', name='admin_0_boundary_lines_land',
+                scale=resolution, facecolor='none')
+            ax.add_feature(countries, edgecolor='black')
+            states_provinces = cartopy.feature.NaturalEarthFeature(
+                category='cultural', name='admin_1_states_provinces_lines',
+                scale=resolution, facecolor='none')
+            ax.add_feature(states_provinces, edgecolor='black')
 
         if show_grid:
-            # Draw parallels
-            vparallels = np.arange(np.floor(np.min(latrange)),
-                                   np.ceil(np.max(latrange)), parallels)
-            if grid_labels:
-                labels = [1, 0, 0, 0]
-            else:
-                labels = [0, 0, 0, 0]
-            m.drawparallels(vparallels, labels=labels, fontsize=10, ax=ax,
-                            rotation=90)
-            # Draw meridians
-            if grid_labels:
-                labels = [0, 0, 0, 1]
-            else:
-                labels = [0, 0, 0, 0]
-            vmeridians = np.arange(np.floor(np.min(lonrange)),
-                                   np.ceil(np.max(lonrange)), meridians)
-            m.drawmeridians(vmeridians, labels=labels, fontsize=10, ax=ax)
+            gl = ax.gridlines(draw_labels=True, linestyle='--')
+            gl.xlabels_top = False
+            gl.ylabels_right = False
+            vmeridians = np.arange(-180, 180, meridians)
+            gl.xlocator = mticker.FixedLocator(vmeridians)
+            vparallels = np.arange(-90, 90, parallels)
+            gl.ylocator = mticker.FixedLocator(vparallels)
             del vparallels, vmeridians
-
-        # Compute map proj coordinates
-        x, y = m(plon, plat)
 
         # Draw filled contours
         cmap = self._get_colormap(cmap, CMAP_FLAG, show_qc)
-        cs = m.pcolormesh(x, y, zdata, vmin=np.min(clevs),
-                          vmax=np.max(clevs), cmap=cmap, ax=ax, zorder=2)
+        cs = ax.pcolormesh(plon, plat, zdata, vmin=np.min(clevs),
+                           vmax=np.max(clevs), cmap=cmap, zorder=2,
+                           transform=projection)
 
         # Add Aircraft track
         if show_track:
-            x1, y1 = m(self.Aircraft_Nav['GPS Longitude'][ind1:ind2],
-                       self.Aircraft_Nav['GPS Latitude'][ind1:ind2])
-            m.plot(x1, y1, 'k.', ax=ax)  # Black dots during normal flight
+            aplon = self.Aircraft_Nav['GPS Longitude'][ind1:ind2]
+            aplat = self.Aircraft_Nav['GPS Latitude'][ind1:ind2]
+            # Black dots during normal flight
+            ax.plot(aplon, aplat, 'k.', transform=projection)
             indices = np.where(
                 np.abs(self.Aircraft_Nav['Roll'][ind1:ind2]) >= 5)
             # White dots during maneuvers
-            m.plot(x1[indices[0]], y1[indices[0]], 'w.', ax=ax)
+            ax.plot(aplon[indices[0]], aplat[indices[0]], 'w.',
+                    transform=projection)
 
         # Plot title & display
         if title_flag:
@@ -332,7 +314,7 @@ show_borders = False removes coastlines, state/national borders, color filling
         if verbose:
             _method_footer_printout()
         if return_flag:
-            return fig, ax, m, cbar  # cax, cbar
+            return fig, ax, cbar  # cax, cbar
 
     #########################################
 
@@ -340,23 +322,20 @@ show_borders = False removes coastlines, state/national borders, color filling
 
         """
 This method plots 4 panels of geolocated AMPR data, along with the aircraft
-track if requested. matplotlib.pyplot.pcolormesh() on a Basemap is the
+track if requested. matplotlib.pyplot.pcolormesh() on a Cartopy basemap is the
 workhorse plotting routine.
 
 chan = String with channel letter. Default is 'A'
 latrange = List with lat range defined. Order and size (>= 2) is irrelevant
-           as max and min are retrieved. If basemap keyword is defined, then
-           this keyword only affects gridlines.
+           as max and min are retrieved.
 lonrange = List with lon range defined. Order and size (>= 2) is irrelevant
-           as max and min are retrieved. If basemap keyword is defined, then
-           this keyword only affects gridlines.
+           as max and min are retrieved.
 parallels = Scalar spacing (deg) for parallels (i.e., constant latitude)
 meridians = Scalar spacing (deg) for meridians (i.e., constant longitude)
 ptitle = Plot title as string
 clevs = List with contour levels. Only max and min values are used.
-cmap = Colormap desired.
-       See http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
-       and dir(cm) for more
+cmap = Colormap desired. See, e.g.,
+       https://matplotlib.org/3.1.0/gallery/color/colormap_reference.html
 save = Filename+path as string to save plot to. Type determined from suffix.
        Careful - .ps/.eps/.pdf files can get huge!
 show_track = Boolean to plot Aircraft track along with AMPR data.
@@ -372,22 +351,17 @@ maneuver = Set to False to suppress the plotting of swaths during significant
            aircraft maneuvers.
 timerange = Time range to plot. Overrides scanrange if both are set.
             Format: timerange = ['hh:mm:ss', 'HH:MM:SS']
-return_flag = Set to True to return Basemap, plot axes, etc. Order of items
-              returned is fig (figure instance), ax (main axis instance),
-              m (Basemap instance), cax (colorbar axis instance),
-              cbar (colorbar instance).
+return_flag = Set to True to return the _FourPanelTrack instance to make
+              additional figure modifications
 show_qc = Set to True to show QC flags instead of TB variables.
-resolution = Resolution of Basemap ('c', 'l', 'i', 'h')
-area_thresh = Area (km^2) below which map features are not shown.
-projection = Map projection to use.
-basemap = Basemap instance to use. None means a new one will be created using
-          information from latrange, lonrange, etc.
-ax, fig = Matplotlib Axes and Figure objects. Either both must be None
-          or both must be valid objects for the plot to work right.
+resolution = Resolution of Cartopy map ('10m', '50m', '110m')
+projection = Cartopy map projection to use.
 title_flag = Set to False to suppress a title
 colorbar_label = Set to False to suppress the colorbar label
 verbose = Set to True for text output
-grid_labels = Flag for turning on or off labels for the lat/lon gridlines
+wmts_layer = Use this to add a WMTS map layer from
+             https://map1c.vis.earthdata.nasa.gov/wmts-geo/wmts.cgi, like
+             'ASTER_GDEM_Color_Shaded_Relief'
         """
         fourpan = _FourPanelTrack(self, **kwargs)
         if 'return_flag' in kwargs.keys():
@@ -671,7 +645,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         print('write_ampr_kmz():')
 
         # 10 GHz (A) channel plotted by default
-        if var is None or isinstance(var, str) == False:
+        if var is None or isinstance(var, str) is False:
             var = DEFAULT_VAR
 
         # Check to make sure data exist!
@@ -752,7 +726,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         Internal method to read L2 netCDF-format AMPR data files.
         Accounts for whether the data are from older netCDF formats
         (2014-2017) or the new CF-compliant format (2017-).
-        
+
         Parameters
         ----------
         inputFile : str
@@ -768,7 +742,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         # Assigning project name (self.Project) based on user input
         self._assign_project_name(project)
         self.keylist = list(level2b.variables.keys())
-        
+
         if 'TB' in self.keylist:
             self.CF_flag = True
         else:
@@ -795,7 +769,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                         'IncidenceAngle'][:, :]
                 if 'RelativeAzimuth' in self.keylist:
                     self.Relative_Azimuth = level2b.variables[
-                        'RelativeAzimuth'][:, :]           
+                        'RelativeAzimuth'][:, :]
             else:
                 self.Latitude = level2b.variables['lat'][:, :]
                 self.Longitude = level2b.variables['lon'][:, :]
@@ -830,7 +804,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         Parameters
         ----------
         level2b : netCDF4.Dataset object
-            The Dataset object read in from the AMPR data file.       
+            The Dataset object read in from the AMPR data file.
         """
         # Handle the times, convert to a datetime object
         # Add the scan and swath information
@@ -893,7 +867,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                 self.hasDeconvolvedHV = True
             for j, pol in enumerate(chanlist):
                 for i, freq in enumerate(FREQS):
-                    setattr(self, 'TB' + freq + pol, tbdata[j, i, :, :]) 
+                    setattr(self, 'TB' + freq + pol, tbdata[j, i, :, :])
         else:
             if 'tbs_10h' in self.keylist:
                 self.hasDeconvolvedHV = True
@@ -961,12 +935,12 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         for var in self.Aircraft_varlist:
             self.Aircraft_Nav[var][:] = self.bad_data
         # Now, return a structured array of Aircraft_Nav parameters.
-        if self.hasNav: 
+        if self.hasNav:
             if self.CF_flag:
                 self.Aircraft_Nav['GPS Latitude'] = \
                     level2b.variables['GPSLatitude'][:]
                 self.Aircraft_Nav['GPS Longitude'] = \
-                    level2b.variables['GPSLongitude'][:]                
+                    level2b.variables['GPSLongitude'][:]
                 self.Aircraft_Nav['GPS Altitude'] = \
                     level2b.variables['GPSAltitude'][:]
                 self.Aircraft_Nav['Pitch'] = level2b.variables['Pitch'][:]
@@ -1039,7 +1013,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                 for j, chan in enumerate(CHANS):
                     for i, freq in enumerate(FREQS):
                         setattr(self, 'qctb' + freq + chan.lower(),
-                                qcdata[j, i, :, :])                  
+                                qcdata[j, i, :, :])
         else:
             if 'qctb10a' in self.keylist:
                 # If one there, assumes all are in file
@@ -1456,15 +1430,15 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         They can blow up plot_ampr_track() and write_ampr_kmz().
         """
         # infinite and nan check
-        self.TB10A[np.isfinite(self.TB10A) == False] = self.bad_data
-        self.TB19A[np.isfinite(self.TB19A) == False] = self.bad_data
-        self.TB37A[np.isfinite(self.TB37A) == False] = self.bad_data
-        self.TB85A[np.isfinite(self.TB85A) == False] = self.bad_data
+        self.TB10A[np.isfinite(self.TB10A) is False] = self.bad_data
+        self.TB19A[np.isfinite(self.TB19A) is False] = self.bad_data
+        self.TB37A[np.isfinite(self.TB37A) is False] = self.bad_data
+        self.TB85A[np.isfinite(self.TB85A) is False] = self.bad_data
         if hasattr(self, 'TB10B'):  # Assume if one, all are there
-            self.TB10B[np.isfinite(self.TB10B) == False] = self.bad_data
-            self.TB19B[np.isfinite(self.TB19B) == False] = self.bad_data
-            self.TB37B[np.isfinite(self.TB37B) == False] = self.bad_data
-            self.TB85B[np.isfinite(self.TB85B) == False] = self.bad_data
+            self.TB10B[np.isfinite(self.TB10B) is False] = self.bad_data
+            self.TB19B[np.isfinite(self.TB19B) is False] = self.bad_data
+            self.TB37B[np.isfinite(self.TB37B) is False] = self.bad_data
+            self.TB85B[np.isfinite(self.TB85B) is False] = self.bad_data
         else:  # Set all the B channels to bad, these are single-channel data
             for freq in FREQS:
                 setattr(self, 'TB' + freq + 'B',
@@ -1472,8 +1446,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                                                 dtype='float'))
         # Address geolocations if available
         if hasattr(self, 'Latitude'):
-            self.Latitude[np.isfinite(self.Latitude) == False] = self.bad_data
-            self.Longitude[np.isfinite(self.Longitude) == False] = \
+            self.Latitude[np.isfinite(self.Latitude) is False] = self.bad_data
+            self.Longitude[np.isfinite(self.Longitude) is False] = \
                 self.bad_data
 
     #########################################
@@ -1723,7 +1697,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                 else:
                     cmap = amprTB_cmap
             else:
-                cmap = cm.GMT_wysiwyg
+                cmap = 'jet'
         return cmap
 
     #########################################
@@ -1910,12 +1884,12 @@ chan_list = List of strings to enable individual freqs to be deconvolved
 # Stand-alone functions
 
 
-def parse_ax_fig(ax, fig):
+def parse_ax_fig(ax, fig, projection=None):
     """ Parse and return ax and fig parameters. """
     if fig is None:
         fig = plt.figure(figsize=(8, 8))
     if ax is None:
-        ax = fig.add_axes([0.1, 0.15, 0.8, 0.8])
+        ax = fig.add_axes([0.1, 0.15, 0.8, 0.8], projection=projection)
 #    if ax is None:
 #        ax = plt.gca()
 #    if fig is None:
