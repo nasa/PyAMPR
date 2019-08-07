@@ -1,5 +1,13 @@
 Change Log
 ----------
+v1.7.1 major changes (08/07/2019):
+1. Added CAMP2EX to the available project list.
+2. Fixed visual bugs in plot_ampr_channels method to account for recent
+   matplotlib updates. Please update to matplotlib 3.0+ if possible.
+3. Fixed map resolution bug in plot_ampr_track_4panel. Note that this
+   method runs slowly when plotting low-altitude AMPR data on high-
+   resolution background maps. 
+
 v1.7 major changes (07/22/2019):
 1. Removed Basemap as a dependency.
 2. Added Cartopy as a dependency. All maps (e.g., AmprTb.plot_ampr_track) are now created

@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-from mpl_toolkits.basemap import cm
 import time
 import datetime
 import calendar
@@ -56,9 +55,9 @@ data from this site, as well as IPHEX. Depending on project,
 some variables are unused or are duplicates. Most notably,
 pre-MC3E there are no B channels.
 
-Currently available field projects: ORACLES, OLYMPEX, IPHEX, MC3E, TC4, TCSP,
-JAX90, COARE, CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA,
-FIRE3ACE, CAPE
+Currently available field projects: CAMP2EX, ORACLES, OLYMPEX, IPHEX, MC3E,
+TC4, TCSP, JAX90, COARE, CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX,
+TEFLUNA, FIRE3ACE, CAPE
 If you read one project's data while mistakenly telling PyAMPR the data
 are from a different project, then errors are likely.
 
@@ -447,9 +446,10 @@ timerange = Time range to plot. Overrides scanrange if both are set.
                 axes[index].set_ylabel(chan)
                 axes[index].yaxis.set_ticks([2, self.swath_size-5])
                 axes[index].tick_params(axis='y', labelsize=7)
-                axes[index].tick_params(axis='x', labelbottom='off')
-                axes[index].tick_params(axis='y', which='both', left='off',
-                                        right='off')
+                axes[index].tick_params(axis='x', labelbottom=False, top=True,
+                                        length=2.5)
+                axes[index].tick_params(axis='y', which='both', left=False,
+                                        right=False)
                 # Shows how V and H vary with beam position
                 if show_pol is False or show_qc is True:
                     if index % 2 == 0:
@@ -462,8 +462,8 @@ timerange = Time range to plot. Overrides scanrange if both are set.
                 # Get scan timing and plot it as tick labels
                 if index == 0:
                     axes[index].tick_params(
-                        axis='x', labelsize=7, labeltop='on',
-                        direction='out', bottom='off', pad=0)
+                        axis='x', labelsize=7, labeltop=True,
+                        direction='out', labelbottom=False, pad=0)
                     locs, labels = plt.xticks()
                     new_labels = []
                     for t in locs:
@@ -498,7 +498,7 @@ timerange = Time range to plot. Overrides scanrange if both are set.
             axes[9].plot(self.Scan, 5.0+0.0*self.Aircraft_Nav['Roll'], 'k:')
             axes[9].plot(self.Scan, -5.0+0.0*self.Aircraft_Nav['Roll'], 'k:')
             axes[9].set_xlabel('Scan Number or Time (UTC)', fontsize=10)
-            axes[9].tick_params(axis='x', labelsize=10, top='off',
+            axes[9].tick_params(axis='x', labelsize=9, top=False,
                                 direction='out')
             axes[9].set_ylabel('Aircraft Roll (deg)', fontsize=10)
             axes[9].tick_params(axis='y', labelsize=7)
@@ -1007,13 +1007,15 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             The Dataset object read in from the AMPR data file.
         """
         if self.CF_flag:
-            qcdata = np.array(level2b.variables['QC'])
-            if np.ndim(qcdata) != 1:  # Filter out pre-dual-pol QC
-                self.qcIncidence = level2b.variables['IncidenceAngleQC'][:, :]
-                for j, chan in enumerate(CHANS):
-                    for i, freq in enumerate(FREQS):
-                        setattr(self, 'qctb' + freq + chan.lower(),
-                                qcdata[j, i, :, :])
+            if 'QC' in self.keylist:
+                qcdata = np.array(level2b.variables['QC'])
+                if np.ndim(qcdata) != 1:  # Filter out pre-dual-pol QC
+                    self.qcIncidence = \
+                        level2b.variables['IncidenceAngleQC'][:, :]
+                    for j, chan in enumerate(CHANS):
+                        for i, freq in enumerate(FREQS):
+                            setattr(self, 'qctb' + freq + chan.lower(),
+                                    qcdata[j, i, :, :])
         else:
             if 'qctb10a' in self.keylist:
                 # If one there, assumes all are in file
@@ -1108,7 +1110,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             line_split = line.split()
 
             # Header info
-            if self.Project in ['ORACLES', 'OLYMPEX', 'IPHEX', 'MC3E']:
+            if self.Project in ['CAMP2EX', 'ORACLES', 'OLYMPEX',
+                                'IPHEX', 'MC3E']:
                 # 2011+, header info placed before TBs
                 self._fill_2011on_header_info(line_split, index)
             else:
@@ -1139,13 +1142,14 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                     # self.Incidence_Angle[index, i] = float(line_split[i
                     # +27+13*self.swath_size])
 
-                elif self.Project in ['ORACLES', 'OLYMPEX', 'MC3E']:
+                elif self.Project in ['CAMP2EX', 'ORACLES', 'OLYMPEX', 'MC3E']:
                     self._fill_2011on_ampr_variables(line_split, index, i)
 
                 else:  # Pre-MC3E projects
                     self._fill_pre2011_ampr_variables(line_split, index, i)
 
-            if self.Project in ['ORACLES', 'OLYMPEX', 'IPHEX', 'MC3E']:
+            if self.Project in ['CAMP2EX', 'ORACLES', 'OLYMPEX',
+                                'IPHEX', 'MC3E']:
                 # Aircraft_Nav out of order to improve efficiency
                 # for 2011+ projects
                 self._fill_2011on_aircraft_info(line_split, index)
@@ -1239,6 +1243,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                   np.min(self.Scan), 'to', np.max(self.Scan))
             print('Available times =', str(self.Time_String[0]), str('-'),
                   str(self.Time_String[self.nscans-1]))
+            bt = time.time()
+
         if not scanrange and not timerange:
             ind1, ind2 = self._get_min_max_indices()
 
@@ -1283,6 +1289,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
                     _print_times_not_valid()
                 ind1, ind2 = self._get_min_max_indices()
 
+        if verbose:
+            print(time.time()-bt, 'seconds to process scan indices')
         return ind1, ind2
 
     #########################################
@@ -1398,7 +1406,7 @@ chan_list = List of strings to enable individual freqs to be deconvolved
         Vectorizing remaining data assignments for unused/duplicate variables
         Project dependent which variables are or are not used
         """
-        if self.Project in ['ORACLES', 'OLYMPEX', 'IPHEX', 'MC3E']:
+        if self.Project in ['CAMP2EX', 'ORACLES', 'OLYMPEX', 'IPHEX', 'MC3E']:
             self.Noise10[:] = self.bad_data
             self.Noise19[:] = self.bad_data
             self.Noise37[:] = self.bad_data
@@ -1757,8 +1765,8 @@ chan_list = List of strings to enable individual freqs to be deconvolved
             print('Assuming', project.upper(), 'data structure.')
         print('Change to proper project if incorrect, otherwise errors',
               'will occur.')
-        print('Currently available field projects: ORACLES, OLYMPEX, IPHEX,',
-              'MC3E, TC4, TCSP, JAX90, COARE,')
+        print('Currently available field projects: CAMP2EX, ORACLES, OLYMPEX,'
+              'IPHEX, MC3E, TC4, TCSP, JAX90, COARE,')
         print('CAMEX1, CAMEX2, CAMEX3, CAMEX4, TRMMLBA, KWAJEX, TEFLUNA,',
               'FIRE3ACE, CAPE')
         print('Default: project = \''+DEFAULT_PROJECT_NAME+'\'')

@@ -111,7 +111,8 @@ class _FourPanelTrack(object):
             clevs=self.clevs, cmap=self.cmap, show_track=self.show_track,
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
-            show_qc=self.show_qc, ax=self.ax2, fig=self.fig,
+            show_qc=self.show_qc, resolution=self.resolution,
+            projection=self.projection, ax=self.ax2, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange)
         self.ax2.set_title(self.make_title('19', amprtb, ind1, ind2))
 
@@ -123,7 +124,8 @@ class _FourPanelTrack(object):
             clevs=self.clevs, cmap=self.cmap, show_track=self.show_track,
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
-            show_qc=self.show_qc, ax=self.ax3, fig=self.fig,
+            show_qc=self.show_qc, resolution=self.resolution,
+            projection=self.projection, ax=self.ax3, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange)
         self.ax3.set_title(self.make_title('37', amprtb, ind1, ind2))
 
@@ -135,7 +137,8 @@ class _FourPanelTrack(object):
             clevs=self.clevs, cmap=self.cmap, show_track=self.show_track,
             maneuver=self.maneuver, scanrange=self.scanrange,
             show_grid=self.show_grid, equator=self.equator,
-            show_qc=self.show_qc, ax=self.ax4, fig=self.fig,
+            show_qc=self.show_qc, resolution=self.resolution,
+            projection=self.projection, ax=self.ax4, fig=self.fig,
             verbose=self.verbose, timerange=self.timerange)
         self.ax4.set_title(self.make_title('85', amprtb, ind1, ind2))
 
